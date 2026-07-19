@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Refrigerator } from "lucide-react";
 import { ModulePlaceholder } from "@/components/atlas/ModulePlaceholder";
 
-export const Route = createFileRoute("/pantry")({
+export const Route = createFileRoute("/_authenticated/pantry")({
   head: () => ({ meta: [{ title: "Pantry — Atlas" }] }),
   component: () => (
     <ModulePlaceholder

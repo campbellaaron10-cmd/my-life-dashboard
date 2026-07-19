@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Wallet } from "lucide-react";
 import { ModulePlaceholder } from "@/components/atlas/ModulePlaceholder";
 
-export const Route = createFileRoute("/money")({
+export const Route = createFileRoute("/_authenticated/money")({
   head: () => ({ meta: [{ title: "Money — Atlas" }] }),
   component: () => (
     <ModulePlaceholder
