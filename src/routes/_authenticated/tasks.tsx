@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { CheckSquare } from "lucide-react";
 import { ModulePlaceholder } from "@/components/atlas/ModulePlaceholder";
 
-export const Route = createFileRoute("/tasks")({
+export const Route = createFileRoute("/_authenticated/tasks")({
   head: () => ({ meta: [{ title: "Tasks — Atlas" }] }),
   component: () => (
     <ModulePlaceholder

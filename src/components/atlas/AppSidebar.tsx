@@ -1,11 +1,18 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Wallet,
   Refrigerator,
   ShoppingBasket,
   CheckSquare,
+  Shield,
+  Users,
+  Monitor,
+  LogOut,
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { usePrivacyMode, type PrivacyMode } from "@/context/PrivacyMode";
 
 const items = [
   { title: "Dashboard", to: "/", icon: LayoutDashboard },
@@ -15,12 +22,30 @@ const items = [
   { title: "Tasks", to: "/tasks", icon: CheckSquare },
 ] as const;
 
+const modeMeta: Record<PrivacyMode, { label: string; icon: typeof Shield; hint: string }> = {
+  private: { label: "Private", icon: Shield, hint: "All data visible" },
+  guest: { label: "Guest", icon: Users, hint: "Finance hidden" },
+  wall: { label: "Wall", icon: Monitor, hint: "Ambient display" },
+};
+
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { mode, cycle } = usePrivacyMode();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const ModeIcon = modeMeta[mode].icon;
+
+  async function handleSignOut() {
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  }
 
   return (
     <aside className="glass-panel sticky top-0 z-20 flex h-screen w-64 flex-col border-r border-white/5 p-6">
-      <Link to="/" className="mb-12 flex items-center gap-3 px-2">
+      <Link to="/" className="mb-10 flex items-center gap-3 px-2">
         <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-accent text-xl font-bold italic text-background">
           A
         </div>
@@ -49,16 +74,35 @@ export function AppSidebar() {
         })}
       </nav>
 
-      <div className="mt-auto rounded-2xl border border-white/5 bg-white/5 p-4">
-        <div className="flex items-center gap-3">
+      {/* Privacy Mode toggle */}
+      <button
+        onClick={cycle}
+        title={`Privacy: ${modeMeta[mode].hint}. Click to cycle.`}
+        className="mb-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition-all hover:bg-white/10"
+      >
+        <ModeIcon className="size-5 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            Privacy Mode
+          </p>
+          <p className="truncate text-sm font-medium">{modeMeta[mode].label}</p>
+        </div>
+      </button>
+
+      <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
+        <button
+          onClick={handleSignOut}
+          className="flex w-full items-center gap-3 text-left transition-opacity hover:opacity-80"
+        >
           <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/60 to-accent/60 text-sm font-semibold text-background">
             A
           </div>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">Aaron</p>
-            <p className="truncate text-xs text-muted-foreground">System Admin</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">Operator</p>
+            <p className="truncate text-xs text-muted-foreground">Sign out</p>
           </div>
-        </div>
+          <LogOut className="size-4 shrink-0 text-muted-foreground" />
+        </button>
       </div>
     </aside>
   );
