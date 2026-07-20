@@ -6,8 +6,6 @@ import {
   Refrigerator,
   CheckSquare,
   CloudSun,
-  Utensils,
-  ChefHat,
   Shield,
   Users,
   Monitor,
@@ -19,9 +17,7 @@ import { usePrivacyMode, type PrivacyMode } from "@/context/PrivacyMode";
 const items = [
   { title: "Dashboard", to: "/", icon: LayoutDashboard },
   { title: "Money", to: "/money", icon: Wallet },
-  { title: "Foods", to: "/foods", icon: Utensils },
-  { title: "Pantry", to: "/pantry", icon: Refrigerator },
-  { title: "Recipes", to: "/recipes", icon: ChefHat },
+  { title: "Food", to: "/pantry", icon: Refrigerator },
   { title: "Tasks", to: "/tasks", icon: CheckSquare },
   { title: "Weather", to: "/weather", icon: CloudSun },
 ] as const;
@@ -58,7 +54,13 @@ export function AppSidebar() {
 
       <nav className="flex-1 space-y-1.5">
         {items.map((item) => {
-          const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+          const foodPaths = ["/pantry", "/recipes", "/foods"];
+          const active =
+            item.to === "/"
+              ? pathname === "/"
+              : item.to === "/pantry"
+              ? foodPaths.some((p) => pathname.startsWith(p))
+              : pathname.startsWith(item.to);
           const Icon = item.icon;
           return (
             <Link

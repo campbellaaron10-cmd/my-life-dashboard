@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, ChefHat, ArrowLeft, GripVertical, Search, ShoppingBag } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
+import { FoodTabs } from "@/components/atlas/FoodTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,6 +36,7 @@ function RecipeList() {
 
   return (
     <div className="space-y-8">
+      <FoodTabs />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Cookbook</p>

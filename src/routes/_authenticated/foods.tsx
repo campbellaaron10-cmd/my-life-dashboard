@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Search, Trash2, Utensils, Loader2, Check } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
+import { FoodTabs } from "@/components/atlas/FoodTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,12 +81,13 @@ function FoodsPage() {
 
   return (
     <div className="space-y-8">
+      <FoodTabs />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Nutrition Library</p>
-          <h1 className="text-4xl font-bold tracking-tight">Foods</h1>
+          <h1 className="text-4xl font-bold tracking-tight">Food Library</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Search USDA to import verified nutrition, or add a manual entry. Pantry and recipes reference these foods so nutrition is defined once.
+            Every food you've saved — review nutrition, fix bad matches, or add a manual entry. You don't need to visit this page to add pantry items; USDA search is built into Add Pantry Item.
           </p>
         </div>
         <Button variant="secondary" onClick={() => setManual({ source: "manual", nutrient_basis: "per_100g", serving_unit: "serving", household_measures: [] as any })}>
