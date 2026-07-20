@@ -179,7 +179,7 @@ function RecipeDetail({ id }: { id: string }) {
         recipeId={r.id}
         foods={foods.data ?? []}
         onClose={() => setEditIng(null)}
-        onSave={async (v) => { await upsertIng.mutateAsync(v); setEditIng(null); }}
+        onSave={async (v) => { await upsertIng.mutateAsync({ ...v, recipe_id: r.id }); setEditIng(null); }}
         onDelete={async (v) => { await delIng.mutateAsync(v as RecipeIngredient); setEditIng(null); }}
       />
     </div>
