@@ -183,16 +183,85 @@ export function usePantry(opts?: UseQueryOptions<PantryItem[]>) {
   });
 }
 
+/**
+ * Find-or-create a minimal Food row by case-insensitive name for the current user.
+ * Used to guarantee every pantry item is linked to the Food Library so recipes
+ * can reference nutrition later. Nutrition fields stay empty until the user
+ * imports from USDA or fills them in — the link is what matters.
+ */
+export async function ensureFoodForName(name: string): Promise<Food> {
+  const user_id = await currentUserId();
+  const trimmed = name.trim();
+  const existing = await supabase
+    .from("foods").select("*")
+    .eq("user_id", user_id).ilike("name", trimmed)
+    .limit(1).maybeSingle();
+  if (existing.data) return existing.data as Food;
+  const ins = await supabase.from("foods").insert({
+    user_id, name: trimmed, source: "manual", nutrient_basis: "per_100g",
+  }).select().single();
+  if (ins.error) throw ins.error;
+  return ins.data as Food;
+}
+
 export function useUpsertPantry() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: Partial<PantryItem> & { name: string }) => {
       const user_id = await currentUserId();
-      const { data, error } = await supabase.from("pantry_items").upsert({ ...input, user_id }).select().single();
+      let food_id = input.food_id ?? null;
+      // Guarantee a Food Library link so recipes can reuse nutrition.
+      if (!food_id && input.name?.trim()) {
+        const food = await ensureFoodForName(input.name);
+        food_id = food.id;
+      }
+      const { data, error } = await supabase
+        .from("pantry_items").upsert({ ...input, food_id, user_id }).select().single();
       if (error) throw error;
       return data;
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.pantry }); toast.success("Pantry updated"); },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.pantry });
+      qc.invalidateQueries({ queryKey: qk.foods });
+      toast.success("Pantry updated");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/**
+ * Backfill: for every pantry item with no food_id, find-or-create a Food by name
+ * and link it. Safe to run repeatedly — deduplicates by case-insensitive name.
+ */
+export function useBackfillPantryFoods() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data: items, error } = await supabase
+        .from("pantry_items").select("id, name, food_id").is("food_id", null);
+      if (error) throw error;
+      const rows = (items ?? []).filter((r) => r.name?.trim());
+      if (!rows.length) return { linked: 0 };
+      const cache = new Map<string, string>();
+      let linked = 0;
+      for (const r of rows) {
+        const key = r.name!.trim().toLowerCase();
+        let fid = cache.get(key);
+        if (!fid) {
+          const food = await ensureFoodForName(r.name!);
+          fid = food.id;
+          cache.set(key, fid);
+        }
+        const upd = await supabase.from("pantry_items").update({ food_id: fid }).eq("id", r.id);
+        if (!upd.error) linked++;
+      }
+      return { linked };
+    },
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: qk.pantry });
+      qc.invalidateQueries({ queryKey: qk.foods });
+      if (r.linked > 0) toast.success(`Linked ${r.linked} pantry item${r.linked > 1 ? "s" : ""} to Food Library`);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 }
