@@ -97,30 +97,36 @@ export const getUsdaFood = createServerFn({ method: "POST" })
     if (!res.ok) throw new Error(`USDA lookup failed: ${res.status}`);
     const f = (await res.json()) as any;
 
-    // 1. foodNutrients are per 100 g for every dataset that ships them.
+    // Determine basis: solids default to per_100g; liquid servings (ml/l/fl oz) → per_100ml.
+    const rawUnit = (f.servingSizeUnit || "").toLowerCase();
+    const servingUnitLower = rawUnit.replace("grm", "g").replace("mlt", "ml");
+    const isVolume = ["ml", "l", "fl oz", "floz"].includes(servingUnitLower);
+    const basis: "per_100g" | "per_100ml" = isVolume ? "per_100ml" : "per_100g";
+
+    // 1. foodNutrients are per 100 g / 100 ml.
     const per100: Partial<UsdaFoodNormalized> = {};
     for (const n of f.foodNutrients ?? []) {
-      const id = String(n.nutrient?.number ?? n.nutrientNumber ?? "");
-      const key = NUTRIENT_IDS[id];
+      const idKey = String(n.nutrient?.number ?? n.nutrientNumber ?? n.nutrient?.id ?? n.nutrientId ?? "");
+      const key = NUTRIENT_IDS[idKey];
       if (!key) continue;
       const amount = typeof n.amount === "number" ? n.amount : typeof n.value === "number" ? n.value : null;
       if (amount != null) (per100 as any)[key] = Number(amount.toFixed(3));
     }
 
-    // 2. If foodNutrients missing (some Branded), fall back to labelNutrients
-    //    (per serving) scaled to per 100 g when we know grams/serving.
+    // 2. Fallback: labelNutrients (per serving) scaled to per 100 g/ml.
     const hasAny = Object.keys(per100).length > 0;
     const label = f.labelNutrients;
-    const servingUnitLower = (f.servingSizeUnit || "").toLowerCase().replace("grm", "g");
-    const gramsPerServing =
-      f.servingSize && (servingUnitLower === "g" || servingUnitLower === "oz")
-        ? servingUnitLower === "oz"
-          ? f.servingSize * 28.3495
-          : f.servingSize
-        : undefined;
+    let servingBaseAmount: number | undefined; // grams OR ml per serving
+    if (f.servingSize) {
+      if (servingUnitLower === "g" || servingUnitLower === "ml") servingBaseAmount = f.servingSize;
+      else if (servingUnitLower === "oz") servingBaseAmount = f.servingSize * 28.3495;
+      else if (servingUnitLower === "fl oz" || servingUnitLower === "floz") servingBaseAmount = f.servingSize * 29.5735;
+      else if (servingUnitLower === "l") servingBaseAmount = f.servingSize * 1000;
+    }
+    const gramsPerServing = isVolume ? undefined : servingBaseAmount;
 
-    if (!hasAny && label && gramsPerServing) {
-      const scale = 100 / gramsPerServing;
+    if (!hasAny && label && servingBaseAmount) {
+      const scale = 100 / servingBaseAmount;
       const map: [keyof UsdaFoodNormalized, string][] = [
         ["n_calories", "calories"],
         ["n_protein_g", "protein"],
@@ -135,6 +141,7 @@ export const getUsdaFood = createServerFn({ method: "POST" })
         if (typeof v === "number") (per100 as any)[dest] = Number((v * scale).toFixed(3));
       }
     }
+
 
     // 3. Household measures from foodPortions.
     const measures: UsdaHouseholdMeasure[] = [];
