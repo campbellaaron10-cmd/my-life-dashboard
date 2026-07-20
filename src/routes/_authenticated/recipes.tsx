@@ -307,17 +307,55 @@ function IngredientDialog({ open, initial, recipeId, foods, onClose, onSave, onD
   onSave: (v: Partial<RecipeIngredient>) => void | Promise<void>;
   onDelete: (v: Partial<RecipeIngredient>) => void | Promise<void>;
 }) {
+  const importUsda = useImportUsdaFood();
+  const usdaSearch = useServerFn(searchUsdaFoods);
+  const usdaGet = useServerFn(getUsdaFood);
   const [form, setForm] = useState<Partial<RecipeIngredient>>({});
   const [foodQuery, setFoodQuery] = useState("");
-  useEffect(() => { setForm(initial ?? { recipe_id: recipeId }); setFoodQuery(""); }, [initial, recipeId]);
+  const [hits, setHits] = useState<UsdaSearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [importingId, setImportingId] = useState<number | null>(null);
+  useEffect(() => {
+    setForm(initial ?? { recipe_id: recipeId });
+    setFoodQuery(""); setHits([]);
+  }, [initial, recipeId]);
 
   const linkedFood = form.food_id ? foods.find((f) => f.id === form.food_id) : undefined;
-  const matches = foodQuery ? foods.filter((f) => f.name.toLowerCase().includes(foodQuery.toLowerCase())).slice(0, 8) : [];
+  const matches = foodQuery ? foods.filter((f) => f.name.toLowerCase().includes(foodQuery.toLowerCase())).slice(0, 6) : [];
 
   // Merge household-measure units from the linked food into unit dropdown.
   const foodMeasures = (linkedFood?.household_measures as any[] | null) ?? [];
   const measureUnits = Array.from(new Set(foodMeasures.map((m: any) => String(m.unit)).filter(Boolean)));
   const currentMeasure = linkedFood && form.unit ? findMeasure(foodMeasures as any, form.unit) : undefined;
+
+  async function runUsda(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!foodQuery.trim()) return;
+    setSearching(true);
+    try {
+      const r = await usdaSearch({ data: { query: foodQuery, pageSize: 10 } });
+      setHits(r.hits);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function pickUsda(hit: UsdaSearchHit) {
+    setImportingId(hit.fdcId);
+    try {
+      const d = await usdaGet({ data: { fdcId: hit.fdcId } });
+      const food = await importUsda.mutateAsync(d);
+      setForm((f) => ({ ...f, food_id: food.id, name_override: null }));
+      setHits([]); setFoodQuery("");
+      toast.success(`Linked ${food.name}`);
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setImportingId(null);
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -329,27 +367,60 @@ function IngredientDialog({ open, initial, recipeId, foods, onClose, onSave, onD
               <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
                 <div>
                   <p className="text-sm font-medium">{linkedFood.name}</p>
-                  {linkedFood.brand && <p className="text-[11px] text-muted-foreground">{linkedFood.brand}</p>}
+                  <p className="text-[11px] text-muted-foreground">
+                    {[linkedFood.brand, linkedFood.source === "usda" ? `USDA #${linkedFood.external_id}` : "manual"].filter(Boolean).join(" · ")}
+                  </p>
                 </div>
                 <Button size="sm" variant="ghost" onClick={() => setForm({ ...form, food_id: null })}>Change</Button>
               </div>
             ) : (
               <>
-                <div className="flex items-center gap-2">
-                  <Search className="size-4 text-muted-foreground" />
-                  <Input placeholder="Search saved foods…" value={foodQuery} onChange={(e) => setFoodQuery(e.target.value)} />
-                </div>
-                {matches.length > 0 && (
-                  <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-white/5 bg-white/5">
+                <form onSubmit={runUsda} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Search USDA or your library — e.g. olive oil"
+                      value={foodQuery}
+                      onChange={(e) => setFoodQuery(e.target.value)}
+                      className="pl-8"
+                    />
+                  </div>
+                  <Button type="submit" disabled={searching}>
+                    {searching ? <Loader2 className="size-4 animate-spin" /> : "USDA"}
+                  </Button>
+                </form>
+                {(matches.length > 0 || hits.length > 0) && (
+                  <div className="mt-2 space-y-1 rounded-xl border border-white/5 bg-white/5 p-1">
                     {matches.map((f) => (
-                      <button key={f.id} className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-white/10"
-                        onClick={() => { setForm({ ...form, food_id: f.id }); setFoodQuery(""); }}>
-                        <span className="text-sm">{f.name}</span>
-                        {f.brand && <span className="text-[10px] text-muted-foreground">{f.brand}</span>}
+                      <button key={f.id}
+                        onClick={() => { setForm({ ...form, food_id: f.id, name_override: null }); setFoodQuery(""); setHits([]); }}
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-white/10">
+                        <span className="text-sm">
+                          <span className="font-medium">{f.name}</span>
+                          {f.brand && <span className="text-muted-foreground"> · {f.brand}</span>}
+                        </span>
+                        <span className="font-mono text-[10px] text-primary/80">saved</span>
+                      </button>
+                    ))}
+                    {hits.map((h) => (
+                      <button key={h.fdcId} onClick={() => pickUsda(h)} disabled={importingId === h.fdcId}
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-white/10 disabled:opacity-50">
+                        <span className="min-w-0 flex-1 text-sm">
+                          <span className="font-medium">{h.description}</span>
+                          <span className="ml-1 text-[11px] text-muted-foreground">
+                            {[h.brandOwner || h.brandName, h.dataType].filter(Boolean).join(" · ")}
+                          </span>
+                        </span>
+                        {importingId === h.fdcId
+                          ? <Loader2 className="size-4 animate-spin" />
+                          : <span className="font-mono text-[10px] text-muted-foreground">USDA</span>}
                       </button>
                     ))}
                   </div>
                 )}
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Picking a USDA result saves nutrition to your Food Library — reused automatically next time.
+                </p>
                 <div className="mt-2">
                   <Field label="Or free-text name">
                     <Input value={form.name_override ?? ""} onChange={(e) => setForm({ ...form, name_override: e.target.value || null })} />
@@ -358,6 +429,7 @@ function IngredientDialog({ open, initial, recipeId, foods, onClose, onSave, onD
               </>
             )}
           </Field>
+
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Quantity"><Input type="number" step="0.01" value={form.quantity ?? 1} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} /></Field>
