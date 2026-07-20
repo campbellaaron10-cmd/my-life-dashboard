@@ -334,7 +334,8 @@ export function useApplyFunRollover() {
   });
 }
 
-
+// ---------- Pantry ----------
+export function usePantry(opts?: UseQueryOptions<PantryItem[]>) {
   return useQuery<PantryItem[]>({
     queryKey: qk.pantry,
     queryFn: async () => {
