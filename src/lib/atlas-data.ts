@@ -662,15 +662,14 @@ export function computePantryCoverage(
   foodsById: Map<string, Food>,
 ): { coverage: number; perIngredient: { ingredient: RecipeIngredient; need: number | null; have: number; ratio: number; estimated: boolean }[] } {
   const per: { ingredient: RecipeIngredient; need: number | null; have: number; ratio: number; estimated: boolean }[] = [];
-  let minRatio = 1;
+  let ratioSum = 0;
   let counted = 0;
 
   for (const ing of ingredients) {
-    if (!ing.food_id) { per.push({ ingredient: ing, need: null, have: 0, ratio: 1, estimated: true }); continue; }
+    if (!ing.food_id) { per.push({ ingredient: ing, need: null, have: 0, ratio: 0, estimated: true }); continue; }
     const food = foodsById.get(ing.food_id);
-    if (!food) { per.push({ ingredient: ing, need: null, have: 0, ratio: 1, estimated: true }); continue; }
+    if (!food) { per.push({ ingredient: ing, need: null, have: 0, ratio: 0, estimated: true }); continue; }
     const need = resolveAmountInBasis(food, Number(ing.quantity), ing.unit);
-    if (need.amount == null) { per.push({ ingredient: ing, need: null, have: 0, ratio: 1, estimated: true }); continue; }
 
     // Sum pantry stocks of this food, converted to the food's basis.
     let have = 0;
@@ -680,13 +679,22 @@ export function computePantryCoverage(
       if (h.amount != null) have += h.amount;
       if (h.estimated) est = true;
     }
-    const ratio = need.amount === 0 ? 1 : Math.min(1, have / need.amount);
+
+    // If we can't resolve the need amount, fall back to presence: any stock => full credit.
+    let ratio: number;
+    if (need.amount == null) {
+      ratio = have > 0 ? 1 : 0;
+      est = true;
+    } else {
+      ratio = need.amount === 0 ? 1 : Math.min(1, have / need.amount);
+    }
     per.push({ ingredient: ing, need: need.amount, have, ratio, estimated: est });
-    minRatio = Math.min(minRatio, ratio);
+    ratioSum += ratio;
     counted++;
   }
 
-  return { coverage: counted ? minRatio : 0, perIngredient: per };
+  return { coverage: counted ? ratioSum / counted : 0, perIngredient: per };
+
 }
 
 // Small helper for UI unit hints.
