@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, ChefHat, ArrowLeft, GripVertical, Search, ShoppingBag } from "lucide-react";
+import { Plus, Trash2, ChefHat, ArrowLeft, GripVertical, Search, ShoppingBag, Loader2 } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { FoodTabs } from "@/components/atlas/FoodTabs";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   useRecipes, useUpsertRecipe, useDeleteRecipe, useRecipe,
   useRecipeIngredients, useUpsertIngredient, useDeleteIngredient,
-  useFoods, usePantry, useUpsertTask,
+  useFoods, usePantry, useUpsertTask, useImportUsdaFood,
   computeRecipeNutrition, perServing, computePantryCoverage,
   type Recipe, type RecipeIngredient, type Food,
 } from "@/lib/atlas-data";
+import { searchUsdaFoods, getUsdaFood, type UsdaSearchHit } from "@/lib/usda.functions";
+
 import { UNIT_OPTIONS, findMeasure } from "@/lib/units";
 import { toast } from "sonner";
 
