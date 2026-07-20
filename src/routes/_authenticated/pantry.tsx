@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  usePantry, useUpsertPantry, useDeletePantry, useFoods, useImportUsdaFood,
+  usePantry, useUpsertPantry, useDeletePantry, useFoods, useImportUsdaFood, useBackfillPantryFoods,
   daysUntil, describeUnitKind, type PantryItem, type Food,
 } from "@/lib/atlas-data";
 import { searchUsdaFoods, getUsdaFood, type UsdaSearchHit } from "@/lib/usda.functions";
@@ -28,8 +28,18 @@ const LOCATIONS = ["pantry", "fridge", "freezer", "other"] as const;
 function PantryPage() {
   const items = usePantry();
   const foods = useFoods();
+  const backfill = useBackfillPantryFoods();
   const [dialog, setDialog] = useState<Partial<PantryItem> | null>(null);
   const [filter, setFilter] = useState<string>("all");
+
+  // Auto-link legacy pantry items to the Food Library once, after data loads.
+  useEffect(() => {
+    if (!items.data || items.data.length === 0) return;
+    if (backfill.isPending || backfill.isSuccess || backfill.isError) return;
+    const unlinked = items.data.some((i) => !i.food_id && i.name?.trim());
+    if (unlinked) backfill.mutate();
+  }, [items.data, backfill]);
+
 
   const foodsById = useMemo(() => {
     const m = new Map<string, Food>();
