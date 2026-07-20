@@ -397,6 +397,7 @@ export type Database = {
           prep_minutes: number | null
           servings: number
           source_url: string | null
+          tags: string[]
           title: string
           updated_at: string
           user_id: string
@@ -412,6 +413,7 @@ export type Database = {
           prep_minutes?: number | null
           servings?: number
           source_url?: string | null
+          tags?: string[]
           title: string
           updated_at?: string
           user_id: string
@@ -427,6 +429,7 @@ export type Database = {
           prep_minutes?: number | null
           servings?: number
           source_url?: string | null
+          tags?: string[]
           title?: string
           updated_at?: string
           user_id?: string
