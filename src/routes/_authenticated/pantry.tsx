@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { usePantry, useUpsertPantry, useDeletePantry, daysUntil, type PantryItem } from "@/lib/atlas-data";
+import { usePantry, useUpsertPantry, useDeletePantry, useFoods, daysUntil, type PantryItem } from "@/lib/atlas-data";
 
 export const Route = createFileRoute("/_authenticated/pantry")({
   head: () => ({ meta: [{ title: "Pantry — Atlas" }] }),
@@ -101,6 +101,7 @@ function PantryPage() {
 function PantryDialog({ open, initial, onClose }: { open: boolean; initial: Partial<PantryItem> | null; onClose: () => void }) {
   const upsert = useUpsertPantry();
   const del = useDeletePantry();
+  const foods = useFoods();
   const [form, setForm] = useState<Partial<PantryItem>>({});
   useEffect(() => { setForm(initial ?? {}); }, [initial]);
 
@@ -109,6 +110,20 @@ function PantryDialog({ open, initial, onClose }: { open: boolean; initial: Part
       <DialogContent className="glass-panel">
         <DialogHeader><DialogTitle>{initial?.id ? "Edit Item" : "New Item"}</DialogTitle></DialogHeader>
         <div className="space-y-4">
+          <Field label="Linked food (optional — enables nutrition)">
+            <select
+              className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+              value={form.food_id ?? ""}
+              onChange={(e) => {
+                const id = e.target.value || null;
+                const food = (foods.data ?? []).find((f) => f.id === id);
+                setForm({ ...form, food_id: id, name: form.name || food?.name || "" });
+              }}
+            >
+              <option value="">— none —</option>
+              {(foods.data ?? []).map((f) => <option key={f.id} value={f.id}>{f.name}{f.brand ? ` (${f.brand})` : ""}</option>)}
+            </select>
+          </Field>
           <Field label="Name"><Input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <div className="grid grid-cols-3 gap-3">
             <Field label="Qty"><Input type="number" step="0.1" value={form.quantity ?? 1} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} /></Field>

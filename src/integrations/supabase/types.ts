@@ -140,6 +140,81 @@ export type Database = {
         }
         Relationships: []
       }
+      foods: {
+        Row: {
+          barcode: string | null
+          brand: string | null
+          calories: number | null
+          carbs_g: number | null
+          created_at: string
+          density_g_per_ml: number | null
+          external_id: string | null
+          fat_g: number | null
+          fiber_g: number | null
+          grams_per_serving: number | null
+          id: string
+          is_archived: boolean
+          name: string
+          notes: string | null
+          protein_g: number | null
+          serving_size: number | null
+          serving_unit: string | null
+          sodium_mg: number | null
+          source: Database["public"]["Enums"]["nutrition_source"]
+          sugar_g: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          barcode?: string | null
+          brand?: string | null
+          calories?: number | null
+          carbs_g?: number | null
+          created_at?: string
+          density_g_per_ml?: number | null
+          external_id?: string | null
+          fat_g?: number | null
+          fiber_g?: number | null
+          grams_per_serving?: number | null
+          id?: string
+          is_archived?: boolean
+          name: string
+          notes?: string | null
+          protein_g?: number | null
+          serving_size?: number | null
+          serving_unit?: string | null
+          sodium_mg?: number | null
+          source?: Database["public"]["Enums"]["nutrition_source"]
+          sugar_g?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          barcode?: string | null
+          brand?: string | null
+          calories?: number | null
+          carbs_g?: number | null
+          created_at?: string
+          density_g_per_ml?: number | null
+          external_id?: string | null
+          fat_g?: number | null
+          fiber_g?: number | null
+          grams_per_serving?: number | null
+          id?: string
+          is_archived?: boolean
+          name?: string
+          notes?: string | null
+          protein_g?: number | null
+          serving_size?: number | null
+          serving_unit?: string | null
+          sodium_mg?: number | null
+          source?: Database["public"]["Enums"]["nutrition_source"]
+          sugar_g?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       grocery_items: {
         Row: {
           category: string | null
@@ -200,6 +275,7 @@ export type Database = {
         Row: {
           created_at: string
           expires_on: string | null
+          food_id: string | null
           id: string
           is_consumed: boolean
           location: Database["public"]["Enums"]["storage_location"]
@@ -215,6 +291,7 @@ export type Database = {
         Insert: {
           created_at?: string
           expires_on?: string | null
+          food_id?: string | null
           id?: string
           is_consumed?: boolean
           location?: Database["public"]["Enums"]["storage_location"]
@@ -230,6 +307,7 @@ export type Database = {
         Update: {
           created_at?: string
           expires_on?: string | null
+          food_id?: string | null
           id?: string
           is_consumed?: boolean
           location?: Database["public"]["Enums"]["storage_location"]
@@ -242,7 +320,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pantry_items_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -265,6 +351,111 @@ export type Database = {
           display_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      recipe_ingredients: {
+        Row: {
+          created_at: string
+          food_id: string | null
+          id: string
+          name_override: string | null
+          note: string | null
+          quantity: number
+          recipe_id: string
+          sort_order: number
+          unit: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          food_id?: string | null
+          id?: string
+          name_override?: string | null
+          note?: string | null
+          quantity?: number
+          recipe_id: string
+          sort_order?: number
+          unit?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          food_id?: string | null
+          id?: string
+          name_override?: string | null
+          note?: string | null
+          quantity?: number
+          recipe_id?: string
+          sort_order?: number
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_ingredients_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_ingredients_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recipes: {
+        Row: {
+          cook_minutes: number | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          instructions: string | null
+          is_archived: boolean
+          prep_minutes: number | null
+          servings: number
+          source_url: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cook_minutes?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          instructions?: string | null
+          is_archived?: boolean
+          prep_minutes?: number | null
+          servings?: number
+          source_url?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cook_minutes?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          instructions?: string | null
+          is_archived?: boolean
+          prep_minutes?: number | null
+          servings?: number
+          source_url?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -454,6 +645,7 @@ export type Database = {
         | "other"
       activity_kind: "transaction" | "task" | "pantry" | "grocery" | "system"
       app_role: "owner" | "member" | "guest"
+      nutrition_source: "usda" | "manual" | "barcode" | "imported"
       privacy_mode: "private" | "guest" | "wall"
       storage_location: "pantry" | "fridge" | "freezer" | "other"
       task_priority: "low" | "normal" | "high"
@@ -596,6 +788,7 @@ export const Constants = {
       ],
       activity_kind: ["transaction", "task", "pantry", "grocery", "system"],
       app_role: ["owner", "member", "guest"],
+      nutrition_source: ["usda", "manual", "barcode", "imported"],
       privacy_mode: ["private", "guest", "wall"],
       storage_location: ["pantry", "fridge", "freezer", "other"],
       task_priority: ["low", "normal", "high"],

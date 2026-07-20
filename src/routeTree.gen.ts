@@ -14,9 +14,11 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedWeatherRouteImport } from './routes/_authenticated/weather'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
+import { Route as AuthenticatedRecipesRouteImport } from './routes/_authenticated/recipes'
 import { Route as AuthenticatedPantryRouteImport } from './routes/_authenticated/pantry'
 import { Route as AuthenticatedMoneyRouteImport } from './routes/_authenticated/money'
 import { Route as AuthenticatedGroceryRouteImport } from './routes/_authenticated/grocery'
+import { Route as AuthenticatedFoodsRouteImport } from './routes/_authenticated/foods'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -42,6 +44,11 @@ const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
   path: '/tasks',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedRecipesRoute = AuthenticatedRecipesRouteImport.update({
+  id: '/recipes',
+  path: '/recipes',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPantryRoute = AuthenticatedPantryRouteImport.update({
   id: '/pantry',
   path: '/pantry',
@@ -57,21 +64,30 @@ const AuthenticatedGroceryRoute = AuthenticatedGroceryRouteImport.update({
   path: '/grocery',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFoodsRoute = AuthenticatedFoodsRouteImport.update({
+  id: '/foods',
+  path: '/foods',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
+  '/foods': typeof AuthenticatedFoodsRoute
   '/grocery': typeof AuthenticatedGroceryRoute
   '/money': typeof AuthenticatedMoneyRoute
   '/pantry': typeof AuthenticatedPantryRoute
+  '/recipes': typeof AuthenticatedRecipesRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/weather': typeof AuthenticatedWeatherRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
+  '/foods': typeof AuthenticatedFoodsRoute
   '/grocery': typeof AuthenticatedGroceryRoute
   '/money': typeof AuthenticatedMoneyRoute
   '/pantry': typeof AuthenticatedPantryRoute
+  '/recipes': typeof AuthenticatedRecipesRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/weather': typeof AuthenticatedWeatherRoute
   '/': typeof AuthenticatedIndexRoute
@@ -80,9 +96,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/foods': typeof AuthenticatedFoodsRoute
   '/_authenticated/grocery': typeof AuthenticatedGroceryRoute
   '/_authenticated/money': typeof AuthenticatedMoneyRoute
   '/_authenticated/pantry': typeof AuthenticatedPantryRoute
+  '/_authenticated/recipes': typeof AuthenticatedRecipesRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/_authenticated/weather': typeof AuthenticatedWeatherRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
@@ -92,20 +110,33 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/foods'
     | '/grocery'
     | '/money'
     | '/pantry'
+    | '/recipes'
     | '/tasks'
     | '/weather'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/grocery' | '/money' | '/pantry' | '/tasks' | '/weather' | '/'
+  to:
+    | '/auth'
+    | '/foods'
+    | '/grocery'
+    | '/money'
+    | '/pantry'
+    | '/recipes'
+    | '/tasks'
+    | '/weather'
+    | '/'
   id:
     | '__root__'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/foods'
     | '/_authenticated/grocery'
     | '/_authenticated/money'
     | '/_authenticated/pantry'
+    | '/_authenticated/recipes'
     | '/_authenticated/tasks'
     | '/_authenticated/weather'
     | '/_authenticated/'
@@ -153,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTasksRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/recipes': {
+      id: '/_authenticated/recipes'
+      path: '/recipes'
+      fullPath: '/recipes'
+      preLoaderRoute: typeof AuthenticatedRecipesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/pantry': {
       id: '/_authenticated/pantry'
       path: '/pantry'
@@ -174,22 +212,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedGroceryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/foods': {
+      id: '/_authenticated/foods'
+      path: '/foods'
+      fullPath: '/foods'
+      preLoaderRoute: typeof AuthenticatedFoodsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedFoodsRoute: typeof AuthenticatedFoodsRoute
   AuthenticatedGroceryRoute: typeof AuthenticatedGroceryRoute
   AuthenticatedMoneyRoute: typeof AuthenticatedMoneyRoute
   AuthenticatedPantryRoute: typeof AuthenticatedPantryRoute
+  AuthenticatedRecipesRoute: typeof AuthenticatedRecipesRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedWeatherRoute: typeof AuthenticatedWeatherRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedFoodsRoute: AuthenticatedFoodsRoute,
   AuthenticatedGroceryRoute: AuthenticatedGroceryRoute,
   AuthenticatedMoneyRoute: AuthenticatedMoneyRoute,
   AuthenticatedPantryRoute: AuthenticatedPantryRoute,
+  AuthenticatedRecipesRoute: AuthenticatedRecipesRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedWeatherRoute: AuthenticatedWeatherRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
