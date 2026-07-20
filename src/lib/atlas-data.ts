@@ -562,6 +562,54 @@ export function useDeleteIngredient() {
   });
 }
 
+/** Persist a new ingredient order. Optimistically updates cache. */
+export function useReorderIngredients(recipeId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      await Promise.all(orderedIds.map((id, idx) =>
+        supabase.from("recipe_ingredients").update({ sort_order: idx }).eq("id", id)
+      ));
+    },
+    onMutate: async (orderedIds) => {
+      await qc.cancelQueries({ queryKey: qk.recipeIngredients(recipeId) });
+      const prev = qc.getQueryData<RecipeIngredient[]>(qk.recipeIngredients(recipeId));
+      if (prev) {
+        const byId = new Map(prev.map((r) => [r.id, r]));
+        const next = orderedIds
+          .map((id, idx) => {
+            const row = byId.get(id);
+            return row ? { ...row, sort_order: idx } : null;
+          })
+          .filter(Boolean) as RecipeIngredient[];
+        qc.setQueryData(qk.recipeIngredients(recipeId), next);
+      }
+      return { prev };
+    },
+    onError: (e: Error, _v, ctx) => {
+      if (ctx?.prev) qc.setQueryData(qk.recipeIngredients(recipeId), ctx.prev);
+      toast.error(e.message);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.recipeIngredients(recipeId) }),
+  });
+}
+
+/** Load ingredients for many recipes at once. */
+export function useAllRecipeIngredients(recipeIds: string[]) {
+  const key = recipeIds.slice().sort().join(",");
+  return useQuery({
+    queryKey: ["recipe_ingredients_bulk", key],
+    enabled: recipeIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("recipe_ingredients").select("*").in("recipe_id", recipeIds);
+      if (error) throw error;
+      return data as RecipeIngredient[];
+    },
+  });
+}
+
+
 // ---------- Nutrition math (normalized per 100 g/ml) ----------
 export type NutritionTotals = {
   calories: number; protein_g: number; carbs_g: number; fat_g: number;
