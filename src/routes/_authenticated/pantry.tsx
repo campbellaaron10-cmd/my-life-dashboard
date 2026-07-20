@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  usePantry, useUpsertPantry, useDeletePantry, useFoods, useImportUsdaFood,
+  usePantry, useUpsertPantry, useDeletePantry, useFoods, useImportUsdaFood, useBackfillPantryFoods,
   daysUntil, describeUnitKind, type PantryItem, type Food,
 } from "@/lib/atlas-data";
 import { searchUsdaFoods, getUsdaFood, type UsdaSearchHit } from "@/lib/usda.functions";
