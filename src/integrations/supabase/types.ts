@@ -98,16 +98,67 @@ export type Database = {
         }
         Relationships: []
       }
+      balance_snapshots: {
+        Row: {
+          account_id: string | null
+          balance: number
+          category_id: string | null
+          created_at: string
+          id: string
+          label: string | null
+          on_date: string
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          balance: number
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          label?: string | null
+          on_date?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          balance?: number
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          label?: string | null
+          on_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "balance_snapshots_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "balance_snapshots_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_categories: {
         Row: {
           code: string
           color: string | null
           created_at: string
+          goal_amount: number | null
           id: string
           is_archived: boolean
+          kind: string
           monthly_limit: number
           name: string
           rollover: boolean
+          rollover_balance: number
           sort_order: number
           updated_at: string
           user_id: string
@@ -116,11 +167,14 @@ export type Database = {
           code: string
           color?: string | null
           created_at?: string
+          goal_amount?: number | null
           id?: string
           is_archived?: boolean
+          kind?: string
           monthly_limit?: number
           name: string
           rollover?: boolean
+          rollover_balance?: number
           sort_order?: number
           updated_at?: string
           user_id: string
@@ -129,12 +183,45 @@ export type Database = {
           code?: string
           color?: string | null
           created_at?: string
+          goal_amount?: number | null
           id?: string
           is_archived?: boolean
+          kind?: string
           monthly_limit?: number
           name?: string
           rollover?: boolean
+          rollover_balance?: number
           sort_order?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      finance_settings: {
+        Row: {
+          created_at: string
+          fun_to_fun_pct: number
+          fun_to_sts_pct: number
+          fun_to_vacation_pct: number
+          last_month_closed: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fun_to_fun_pct?: number
+          fun_to_sts_pct?: number
+          fun_to_vacation_pct?: number
+          last_month_closed?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fun_to_fun_pct?: number
+          fun_to_sts_pct?: number
+          fun_to_vacation_pct?: number
+          last_month_closed?: string | null
           updated_at?: string
           user_id?: string
         }

@@ -17,6 +17,8 @@ export type ActivityEvent = Tables["activity_events"]["Row"];
 export type Food = Tables["foods"]["Row"];
 export type Recipe = Tables["recipes"]["Row"];
 export type RecipeIngredient = Tables["recipe_ingredients"]["Row"];
+export type FinanceSettings = Tables["finance_settings"]["Row"];
+export type BalanceSnapshot = Tables["balance_snapshots"]["Row"];
 
 export const qk = {
   accounts: ["accounts"] as const,
@@ -28,6 +30,8 @@ export const qk = {
   foods: ["foods"] as const,
   recipes: ["recipes"] as const,
   recipeIngredients: (recipeId: string) => ["recipe_ingredients", recipeId] as const,
+  financeSettings: ["finance_settings"] as const,
+  balanceSnapshots: ["balance_snapshots"] as const,
 };
 
 async function currentUserId() {
@@ -164,6 +168,166 @@ export function useDeleteBudget() {
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: qk.budgets }); toast.success("Budget removed"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Finance settings ----------
+export const DEFAULT_CATEGORIES = [
+  { code: "ESS", name: "Essentials", kind: "spending", sort_order: 1, rollover: false },
+  { code: "FUN", name: "Fun", kind: "spending", sort_order: 2, rollover: true },
+  { code: "STS", name: "Short-Term Savings", kind: "savings", sort_order: 3, rollover: true },
+  { code: "VAC", name: "Vacation Fund", kind: "savings", sort_order: 4, rollover: true },
+  { code: "LTS", name: "Long-Term Savings", kind: "investment", sort_order: 5, rollover: true },
+  { code: "FED", name: "Fidelity Investments", kind: "investment", sort_order: 6, rollover: true },
+] as const;
+
+export function useFinanceSettings() {
+  return useQuery({
+    queryKey: qk.financeSettings,
+    queryFn: async () => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase.from("finance_settings").select("*").eq("user_id", user_id).maybeSingle();
+      if (error) throw error;
+      return (data as FinanceSettings | null);
+    },
+  });
+}
+
+export function useUpsertFinanceSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<FinanceSettings>) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase.from("finance_settings").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.financeSettings }); toast.success("Settings saved"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useSeedFinanceDefaults() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const user_id = await currentUserId();
+      const { data: existing } = await supabase.from("budget_categories").select("code").eq("user_id", user_id);
+      const have = new Set((existing ?? []).map((r: any) => r.code));
+      const rows = DEFAULT_CATEGORIES.filter((c) => !have.has(c.code)).map((c) => ({
+        user_id, code: c.code, name: c.name, kind: c.kind, sort_order: c.sort_order,
+        rollover: c.rollover, monthly_limit: 0,
+      }));
+      if (rows.length) {
+        const { error } = await supabase.from("budget_categories").insert(rows);
+        if (error) throw error;
+      }
+      // Ensure settings row exists.
+      await supabase.from("finance_settings").upsert({ user_id });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.budgets });
+      qc.invalidateQueries({ queryKey: qk.financeSettings });
+      toast.success("Default categories ready");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Balance snapshots ----------
+export function useBalanceSnapshots() {
+  return useQuery({
+    queryKey: qk.balanceSnapshots,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("balance_snapshots").select("*").order("on_date");
+      if (error) throw error;
+      return data as BalanceSnapshot[];
+    },
+  });
+}
+
+export function useUpsertBalanceSnapshot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<BalanceSnapshot> & { balance: number }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase.from("balance_snapshots").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.balanceSnapshots }); toast.success("Balance recorded"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteBalanceSnapshot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("balance_snapshots").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.balanceSnapshots }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/**
+ * Apply the Fun-money rollover for the previous month:
+ * leftover = FUN monthly_limit - spent(previous month)
+ * split per finance_settings percentages into VAC / STS / FUN rollover_balance.
+ */
+export function useApplyFunRollover() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const user_id = await currentUserId();
+      const [cats, sets, allTxns] = await Promise.all([
+        supabase.from("budget_categories").select("*").eq("user_id", user_id),
+        supabase.from("finance_settings").select("*").eq("user_id", user_id).maybeSingle(),
+        supabase.from("transactions").select("*").eq("user_id", user_id),
+      ]);
+      if (cats.error) throw cats.error;
+      if (allTxns.error) throw allTxns.error;
+      const categories = (cats.data ?? []) as BudgetCategory[];
+      const settings = (sets.data ?? null) as FinanceSettings | null;
+      const funPct = Number(settings?.fun_to_fun_pct ?? 5);
+      const vacPct = Number(settings?.fun_to_vacation_pct ?? 70);
+      const stsPct = Number(settings?.fun_to_sts_pct ?? 25);
+
+      const now = new Date();
+      const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+      const prevKey = prev.toISOString().slice(0, 10);
+      if (settings?.last_month_closed === prevKey) throw new Error("Previous month already closed");
+
+      const fun = categories.find((c) => c.code === "FUN");
+      const vac = categories.find((c) => c.code === "VAC");
+      const sts = categories.find((c) => c.code === "STS");
+      if (!fun) throw new Error("Fun category missing — seed defaults first");
+
+      const spent = (allTxns.data as Transaction[])
+        .filter((t) => t.category_id === fun.id && t.type === "expense"
+          && new Date(t.occurred_on) >= prev && new Date(t.occurred_on) < prevEnd)
+        .reduce((s, t) => s + Number(t.amount), 0);
+      const leftover = Math.max(0, Number(fun.monthly_limit) + Number(fun.rollover_balance) - spent);
+
+      const toFun = (leftover * funPct) / 100;
+      const toVac = (leftover * vacPct) / 100;
+      const toSts = (leftover * stsPct) / 100;
+
+      await supabase.from("budget_categories").update({ rollover_balance: toFun }).eq("id", fun.id);
+      if (vac) await supabase.from("budget_categories").update({ rollover_balance: Number(vac.rollover_balance) + toVac }).eq("id", vac.id);
+      if (sts) await supabase.from("budget_categories").update({ rollover_balance: Number(sts.rollover_balance) + toSts }).eq("id", sts.id);
+      await supabase.from("finance_settings").upsert({ user_id, last_month_closed: prevKey });
+      return { leftover, toFun, toVac, toSts };
+    },
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: qk.budgets });
+      qc.invalidateQueries({ queryKey: qk.financeSettings });
+      toast.success(`Rolled over ${r.leftover.toFixed(2)} · Fun ${r.toFun.toFixed(0)} / Vac ${r.toVac.toFixed(0)} / STS ${r.toSts.toFixed(0)}`);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 }
