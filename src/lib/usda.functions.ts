@@ -47,15 +47,17 @@ function apiKey() {
   return process.env.USDA_API_KEY || "DEMO_KEY";
 }
 
-// USDA nutrient numbers (per 100 g in `foodNutrients`).
+// USDA nutrient keys — indexed by BOTH the numeric nutrient id (1008…) and
+// the older nutrientNumber string ("208"…). Different endpoints/datasets
+// return one or the other, so we accept both.
 const NUTRIENT_IDS: Record<string, keyof UsdaFoodNormalized> = {
-  "1008": "n_calories",
-  "1003": "n_protein_g",
-  "1005": "n_carbs_g",
-  "1004": "n_fat_g",
-  "1079": "n_fiber_g",
-  "2000": "n_sugar_g",
-  "1093": "n_sodium_mg",
+  "1008": "n_calories", "208": "n_calories",
+  "1003": "n_protein_g", "203": "n_protein_g",
+  "1005": "n_carbs_g",   "205": "n_carbs_g",
+  "1004": "n_fat_g",     "204": "n_fat_g",
+  "1079": "n_fiber_g",   "291": "n_fiber_g",
+  "2000": "n_sugar_g",   "269": "n_sugar_g",
+  "1093": "n_sodium_mg", "307": "n_sodium_mg",
 };
 
 export const searchUsdaFoods = createServerFn({ method: "POST" })
