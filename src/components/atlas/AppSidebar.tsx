@@ -54,7 +54,13 @@ export function AppSidebar() {
 
       <nav className="flex-1 space-y-1.5">
         {items.map((item) => {
-          const active = item.to === "/" ? pathname === "/" : pathname.startsWith(item.to);
+          const foodPaths = ["/pantry", "/recipes", "/foods"];
+          const active =
+            item.to === "/"
+              ? pathname === "/"
+              : item.to === "/pantry"
+              ? foodPaths.some((p) => pathname.startsWith(p))
+              : pathname.startsWith(item.to);
           const Icon = item.icon;
           return (
             <Link
