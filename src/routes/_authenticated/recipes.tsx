@@ -36,6 +36,7 @@ function RecipeList() {
 
   return (
     <div className="space-y-8">
+      <FoodTabs />
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Cookbook</p>
