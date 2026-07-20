@@ -17,6 +17,8 @@ export type ActivityEvent = Tables["activity_events"]["Row"];
 export type Food = Tables["foods"]["Row"];
 export type Recipe = Tables["recipes"]["Row"];
 export type RecipeIngredient = Tables["recipe_ingredients"]["Row"];
+export type FinanceSettings = Tables["finance_settings"]["Row"];
+export type BalanceSnapshot = Tables["balance_snapshots"]["Row"];
 
 export const qk = {
   accounts: ["accounts"] as const,
@@ -28,6 +30,8 @@ export const qk = {
   foods: ["foods"] as const,
   recipes: ["recipes"] as const,
   recipeIngredients: (recipeId: string) => ["recipe_ingredients", recipeId] as const,
+  financeSettings: ["finance_settings"] as const,
+  balanceSnapshots: ["balance_snapshots"] as const,
 };
 
 async function currentUserId() {
