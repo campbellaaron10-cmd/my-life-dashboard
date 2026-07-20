@@ -527,14 +527,27 @@ export function useUpsertIngredient() {
   return useMutation({
     mutationFn: async (input: Partial<RecipeIngredient> & { recipe_id: string }) => {
       const user_id = await currentUserId();
-      const { data, error } = await supabase.from("recipe_ingredients").upsert({ ...input, user_id }).select().single();
+      let food_id = input.food_id ?? null;
+      // Auto-link a Food Library entry when the ingredient is free-text only.
+      if (!food_id && input.name_override?.trim()) {
+        const food = await ensureFoodForName(input.name_override);
+        food_id = food.id;
+      }
+      const { data, error } = await supabase
+        .from("recipe_ingredients")
+        .upsert({ ...input, food_id, user_id })
+        .select().single();
       if (error) throw error;
       return data as RecipeIngredient;
     },
-    onSuccess: (row) => qc.invalidateQueries({ queryKey: qk.recipeIngredients(row.recipe_id) }),
+    onSuccess: (row) => {
+      qc.invalidateQueries({ queryKey: qk.recipeIngredients(row.recipe_id) });
+      qc.invalidateQueries({ queryKey: qk.foods });
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 }
+
 
 export function useDeleteIngredient() {
   const qc = useQueryClient();
