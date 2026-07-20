@@ -171,7 +171,7 @@ export const getUsdaFood = createServerFn({ method: "POST" })
       name: f.description,
       brand: f.brandOwner || f.brandName || null,
       dataType: f.dataType || null,
-      nutrient_basis: "per_100g",
+      nutrient_basis: basis,
       n_calories: per100.n_calories ?? null,
       n_protein_g: per100.n_protein_g ?? null,
       n_carbs_g: per100.n_carbs_g ?? null,
