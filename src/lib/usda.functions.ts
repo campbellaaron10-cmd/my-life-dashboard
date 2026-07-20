@@ -12,20 +12,33 @@ export type UsdaSearchHit = {
   servingSizeUnit?: string;
 };
 
-export type UsdaFoodDetail = {
+export type UsdaHouseholdMeasure = {
+  unit: string;
+  amount: number;
+  gramWeight: number;
+  label: string;
+  modifier?: string | null;
+};
+
+export type UsdaFoodNormalized = {
   fdcId: number;
-  description: string;
-  brand?: string;
-  servingSize?: number;
-  servingSizeUnit?: string;
-  gramsPerServing?: number;
-  calories?: number;
-  protein_g?: number;
-  carbs_g?: number;
-  fat_g?: number;
-  fiber_g?: number;
-  sugar_g?: number;
-  sodium_mg?: number;
+  name: string;
+  brand?: string | null;
+  dataType?: string | null;
+  // Nutrition normalized per 100 g (USDA reports foodNutrients per 100 g).
+  nutrient_basis: "per_100g" | "per_100ml";
+  n_calories?: number | null;
+  n_protein_g?: number | null;
+  n_carbs_g?: number | null;
+  n_fat_g?: number | null;
+  n_fiber_g?: number | null;
+  n_sugar_g?: number | null;
+  n_sodium_mg?: number | null;
+  // For display / editing.
+  serving_size?: number | null;
+  serving_unit?: string | null;
+  grams_per_serving?: number | null;
+  household_measures: UsdaHouseholdMeasure[];
 };
 
 const BASE = "https://api.nal.usda.gov/fdc/v1";
@@ -34,16 +47,15 @@ function apiKey() {
   return process.env.USDA_API_KEY || "DEMO_KEY";
 }
 
-// USDA reports nutrients per 100 g by default; when a labelNutrients block
-// exists, it is per serving.
-const NUTRIENT_IDS: Record<string, keyof UsdaFoodDetail> = {
-  "1008": "calories",   // Energy (kcal)
-  "1003": "protein_g",
-  "1005": "carbs_g",
-  "1004": "fat_g",
-  "1079": "fiber_g",
-  "2000": "sugar_g",
-  "1093": "sodium_mg",
+// USDA nutrient numbers (per 100 g in `foodNutrients`).
+const NUTRIENT_IDS: Record<string, keyof UsdaFoodNormalized> = {
+  "1008": "n_calories",
+  "1003": "n_protein_g",
+  "1005": "n_carbs_g",
+  "1004": "n_fat_g",
+  "1079": "n_fiber_g",
+  "2000": "n_sugar_g",
+  "1093": "n_sodium_mg",
 };
 
 export const searchUsdaFoods = createServerFn({ method: "POST" })
@@ -56,12 +68,12 @@ export const searchUsdaFoods = createServerFn({ method: "POST" })
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         query: data.query,
-        pageSize: data.pageSize ?? 15,
+        pageSize: data.pageSize ?? 20,
         dataType: ["Branded", "Foundation", "SR Legacy", "Survey (FNDDS)"],
       }),
     });
     if (!res.ok) throw new Error(`USDA search failed: ${res.status}`);
-    const json = await res.json() as { foods?: any[] };
+    const json = (await res.json()) as { foods?: any[] };
     const hits: UsdaSearchHit[] = (json.foods ?? []).map((f) => ({
       fdcId: f.fdcId,
       description: f.description,
@@ -74,51 +86,93 @@ export const searchUsdaFoods = createServerFn({ method: "POST" })
     return { hits };
   });
 
+// Detailed lookup — returns a fully normalized food ready to insert.
 export const getUsdaFood = createServerFn({ method: "POST" })
   .inputValidator((data: { fdcId: number }) => data)
-  .handler(async ({ data }) => {
+  .handler(async ({ data }): Promise<UsdaFoodNormalized> => {
     const url = `${BASE}/food/${data.fdcId}?api_key=${apiKey()}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`USDA lookup failed: ${res.status}`);
-    const f = await res.json() as any;
+    const f = (await res.json()) as any;
 
-    const detail: UsdaFoodDetail = {
-      fdcId: f.fdcId,
-      description: f.description,
-      brand: f.brandOwner || f.brandName,
-      servingSize: f.servingSize,
-      servingSizeUnit: f.servingSizeUnit,
-    };
-
-    // Prefer labelNutrients (per serving on the actual label) when present.
-    const label = f.labelNutrients;
-    if (label) {
-      detail.calories = label.calories?.value;
-      detail.protein_g = label.protein?.value;
-      detail.carbs_g = label.carbohydrates?.value;
-      detail.fat_g = label.fat?.value;
-      detail.fiber_g = label.fiber?.value;
-      detail.sugar_g = label.sugars?.value;
-      detail.sodium_mg = label.sodium?.value;
-      if (f.servingSize && (f.servingSizeUnit === "g" || f.servingSizeUnit === "GRM")) {
-        detail.gramsPerServing = f.servingSize;
-      }
-      return detail;
-    }
-
-    // Otherwise convert per-100g foodNutrients to per-serving when we know grams.
-    const nutrients: Record<string, number> = {};
+    // 1. foodNutrients are per 100 g for every dataset that ships them.
+    const per100: Partial<UsdaFoodNormalized> = {};
     for (const n of f.foodNutrients ?? []) {
       const id = String(n.nutrient?.number ?? n.nutrientNumber ?? "");
       const key = NUTRIENT_IDS[id];
-      if (key && typeof n.amount === "number") nutrients[key] = n.amount; // per 100 g
+      if (!key) continue;
+      const amount = typeof n.amount === "number" ? n.amount : typeof n.value === "number" ? n.value : null;
+      if (amount != null) (per100 as any)[key] = Number(amount.toFixed(3));
     }
-    const per100 = 100;
-    const grams = (f.servingSize && (f.servingSizeUnit === "g" || f.servingSizeUnit === "GRM")) ? f.servingSize : undefined;
-    const scale = grams ? grams / per100 : 1;
-    if (grams) detail.gramsPerServing = grams;
-    for (const [k, v] of Object.entries(nutrients)) {
-      (detail as any)[k] = Number((v * scale).toFixed(2));
+
+    // 2. If foodNutrients missing (some Branded), fall back to labelNutrients
+    //    (per serving) scaled to per 100 g when we know grams/serving.
+    const hasAny = Object.keys(per100).length > 0;
+    const label = f.labelNutrients;
+    const servingUnitLower = (f.servingSizeUnit || "").toLowerCase().replace("grm", "g");
+    const gramsPerServing =
+      f.servingSize && (servingUnitLower === "g" || servingUnitLower === "oz")
+        ? servingUnitLower === "oz"
+          ? f.servingSize * 28.3495
+          : f.servingSize
+        : undefined;
+
+    if (!hasAny && label && gramsPerServing) {
+      const scale = 100 / gramsPerServing;
+      const map: [keyof UsdaFoodNormalized, string][] = [
+        ["n_calories", "calories"],
+        ["n_protein_g", "protein"],
+        ["n_carbs_g", "carbohydrates"],
+        ["n_fat_g", "fat"],
+        ["n_fiber_g", "fiber"],
+        ["n_sugar_g", "sugars"],
+        ["n_sodium_mg", "sodium"],
+      ];
+      for (const [dest, src] of map) {
+        const v = label[src]?.value;
+        if (typeof v === "number") (per100 as any)[dest] = Number((v * scale).toFixed(3));
+      }
     }
-    return detail;
+
+    // 3. Household measures from foodPortions.
+    const measures: UsdaHouseholdMeasure[] = [];
+    for (const p of f.foodPortions ?? []) {
+      const amount = Number(p.amount ?? 1);
+      const gramWeight = Number(p.gramWeight);
+      if (!gramWeight) continue;
+      const measureName = (p.measureUnit?.name || "").toLowerCase();
+      const modifier = (p.modifier || p.portionDescription || "").toLowerCase().trim() || null;
+      // Prefer the concrete measure name ("cup", "tbsp"), else the modifier, else "unit".
+      const unit =
+        measureName && measureName !== "undetermined"
+          ? measureName
+          : modifier
+          ? modifier.split(",")[0].split(" ")[0]
+          : "unit";
+      const label = `${amount} ${measureName && measureName !== "undetermined" ? measureName : modifier ?? "unit"}`.trim();
+      measures.push({ unit, amount, gramWeight, label, modifier });
+    }
+    // Always include a "serving" measure when we can derive gram weight.
+    if (gramsPerServing) {
+      measures.unshift({ unit: "serving", amount: 1, gramWeight: gramsPerServing, label: "1 serving" });
+    }
+
+    return {
+      fdcId: f.fdcId,
+      name: f.description,
+      brand: f.brandOwner || f.brandName || null,
+      dataType: f.dataType || null,
+      nutrient_basis: "per_100g",
+      n_calories: per100.n_calories ?? null,
+      n_protein_g: per100.n_protein_g ?? null,
+      n_carbs_g: per100.n_carbs_g ?? null,
+      n_fat_g: per100.n_fat_g ?? null,
+      n_fiber_g: per100.n_fiber_g ?? null,
+      n_sugar_g: per100.n_sugar_g ?? null,
+      n_sodium_mg: per100.n_sodium_mg ?? null,
+      serving_size: f.servingSize ?? null,
+      serving_unit: servingUnitLower || null,
+      grams_per_serving: gramsPerServing ?? null,
+      household_measures: measures,
+    };
   });

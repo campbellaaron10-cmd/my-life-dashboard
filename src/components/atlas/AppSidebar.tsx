@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Wallet,
   Refrigerator,
-  ShoppingBasket,
   CheckSquare,
   CloudSun,
   Utensils,
@@ -20,12 +19,11 @@ import { usePrivacyMode, type PrivacyMode } from "@/context/PrivacyMode";
 const items = [
   { title: "Dashboard", to: "/", icon: LayoutDashboard },
   { title: "Money", to: "/money", icon: Wallet },
-  { title: "Pantry", to: "/pantry", icon: Refrigerator },
   { title: "Foods", to: "/foods", icon: Utensils },
+  { title: "Pantry", to: "/pantry", icon: Refrigerator },
   { title: "Recipes", to: "/recipes", icon: ChefHat },
-  { title: "Weather", to: "/weather", icon: CloudSun },
-  { title: "Grocery", to: "/grocery", icon: ShoppingBasket },
   { title: "Tasks", to: "/tasks", icon: CheckSquare },
+  { title: "Weather", to: "/weather", icon: CloudSun },
 ] as const;
 
 const modeMeta: Record<PrivacyMode, { label: string; icon: typeof Shield; hint: string }> = {
@@ -80,7 +78,6 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Privacy Mode toggle */}
       <button
         onClick={cycle}
         title={`Privacy: ${modeMeta[mode].hint}. Click to cycle.`}

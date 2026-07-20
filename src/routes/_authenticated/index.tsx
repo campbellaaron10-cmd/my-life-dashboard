@@ -2,11 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning,
-  AlertTriangle, Plane, ChefHat, ArrowUpRight, Wallet, CheckSquare, Refrigerator, ShoppingBasket,
+  AlertTriangle, Plane, ChefHat, ArrowUpRight, Wallet, CheckSquare, Refrigerator, ShoppingBag,
 } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import {
-  useAccounts, useTransactions, useBudgets, usePantry, useTasks, useGrocery,
+  useAccounts, useTransactions, useBudgets, usePantry, useTasks,
   accountBalance, budgetSpent, daysUntil,
 } from "@/lib/atlas-data";
 import { useSavedLocation, useWeather, weatherCondition } from "@/hooks/useWeather";
@@ -48,7 +48,6 @@ function Dashboard() {
   const budgets = useBudgets();
   const pantry = usePantry();
   const tasks = useTasks();
-  const grocery = useGrocery();
   const { location } = useSavedLocation();
   const weather = useWeather(location);
   const { mode } = usePrivacyMode();
@@ -63,25 +62,25 @@ function Dashboard() {
     .filter((x) => x.days !== null && x.days <= 5)
     .slice(0, 4);
 
-  const todayTasks = (tasks.data ?? [])
-    .filter((t) => !t.is_done)
-    .slice(0, 5);
+  const openTasks = (tasks.data ?? []).filter((t) => !t.is_done);
+  const todayTasks = openTasks.filter((t) => t.kind !== "shopping").slice(0, 5);
+  const shopping = openTasks.filter((t) => t.kind === "shopping");
 
   const briefingItems = useMemo(() => {
     const out: string[] = [];
     if (expiring.some((e) => (e.days ?? 0) <= 1)) out.push(`${expiring.filter((e) => (e.days ?? 0) <= 1).length} pantry item(s) expiring today.`);
-    const highPri = (tasks.data ?? []).filter((t) => !t.is_done && t.priority === "high").length;
+    const highPri = openTasks.filter((t) => t.priority === "high").length;
     if (highPri) out.push(`${highPri} high-priority task${highPri > 1 ? "s" : ""} open.`);
+    if (shopping.length) out.push(`${shopping.length} shopping item${shopping.length > 1 ? "s" : ""} on the list.`);
     const overBudget = (budgets.data ?? []).filter((b) => budgetSpent(b, txns.data ?? []) >= Number(b.monthly_limit) && Number(b.monthly_limit) > 0).length;
     if (overBudget && mode === "private") out.push(`${overBudget} budget${overBudget > 1 ? "s" : ""} over limit.`);
     if (weather.data?.daily[0]?.precipProb && weather.data.daily[0].precipProb >= 60) out.push(`Rain likely today (${weather.data.daily[0].precipProb}%).`);
     if (!out.length) out.push("All systems nominal. No urgent signals.");
     return out;
-  }, [expiring, tasks.data, budgets.data, txns.data, weather.data, mode]);
+  }, [expiring, openTasks, shopping, budgets.data, txns.data, weather.data, mode]);
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
           <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Systems Nominal</p>
@@ -100,7 +99,6 @@ function Dashboard() {
         </Link>
       </header>
 
-      {/* AI Briefing */}
       <GlassCard className="border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -113,7 +111,6 @@ function Dashboard() {
       </GlassCard>
 
       <div className="grid grid-cols-12 gap-6">
-        {/* Financial Core */}
         <PrivacyGuard
           sensitivity="private-only"
           fallback={
@@ -174,7 +171,6 @@ function Dashboard() {
           </GlassCard>
         </PrivacyGuard>
 
-        {/* Weather / Forecast quick */}
         <Link to="/weather" className="col-span-12 lg:col-span-4">
           <GlassCard className="h-full transition-all hover:scale-[1.01]">
             <p className="mb-4 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Forecast</p>
@@ -203,7 +199,6 @@ function Dashboard() {
           </GlassCard>
         </Link>
 
-        {/* Tasks */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-4">
           <div className="mb-6 flex items-center justify-between border-b border-white/5 pb-4">
             <h2 className="text-xl font-semibold">Daily Protocols</h2>
@@ -235,7 +230,6 @@ function Dashboard() {
           )}
         </GlassCard>
 
-        {/* Pantry */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-5">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-semibold">Pantry Intelligence</h2>
@@ -263,34 +257,30 @@ function Dashboard() {
           )}
         </GlassCard>
 
-        {/* Grocery */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-3">
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Grocery</h2>
-            <Link to="/grocery" className="text-xs text-primary hover:underline">Open →</Link>
+            <h2 className="text-xl font-semibold">Shopping</h2>
+            <Link to="/tasks" className="text-xs text-primary hover:underline">Open →</Link>
           </div>
-          {(grocery.data ?? []).filter((g) => !g.is_checked).length === 0 ? (
-            <EmptyLink to="/grocery" icon={ShoppingBasket} text="List empty." />
+          {shopping.length === 0 ? (
+            <EmptyLink to="/tasks" icon={ShoppingBag} text="Nothing to buy." />
           ) : (
             <ul className="space-y-2">
-              {(grocery.data ?? []).filter((g) => !g.is_checked).slice(0, 6).map((g) => (
-                <li key={g.id} className="flex items-center gap-2 text-sm">
+              {shopping.slice(0, 6).map((s) => (
+                <li key={s.id} className="flex items-center gap-2 text-sm">
                   <span className="size-1.5 rounded-full bg-primary" />
-                  {g.name}
+                  <span className="flex-1 truncate">{s.title.replace(/^buy\s+/i, "")}</span>
+                  {s.quantity && <span className="font-mono text-[10px] text-muted-foreground">{s.quantity}{s.unit ? ` ${s.unit}` : ""}</span>}
                 </li>
               ))}
-              {(grocery.data ?? []).filter((g) => !g.is_checked).length > 6 && (
-                <li className="text-xs text-muted-foreground">+{(grocery.data ?? []).filter((g) => !g.is_checked).length - 6} more</li>
+              {shopping.length > 6 && (
+                <li className="text-xs text-muted-foreground">+{shopping.length - 6} more</li>
               )}
             </ul>
           )}
         </GlassCard>
 
-        {/* Atlas Feed (recent activity) */}
-        <PrivacyGuard
-          sensitivity="private-only"
-          fallback={null}
-        >
+        <PrivacyGuard sensitivity="private-only" fallback={null}>
           <GlassCard className="col-span-12">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-xl font-semibold">Atlas Feed</h2>
@@ -336,5 +326,4 @@ function EmptyLink({ to, icon: Icon, text }: { to: string; icon?: typeof Wallet;
   );
 }
 
-// Suppress unused warning for Plane / ChefHat imports (kept for future modules)
 void Plane; void ChefHat;

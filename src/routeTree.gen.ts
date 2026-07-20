@@ -17,7 +17,6 @@ import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedRecipesRouteImport } from './routes/_authenticated/recipes'
 import { Route as AuthenticatedPantryRouteImport } from './routes/_authenticated/pantry'
 import { Route as AuthenticatedMoneyRouteImport } from './routes/_authenticated/money'
-import { Route as AuthenticatedGroceryRouteImport } from './routes/_authenticated/grocery'
 import { Route as AuthenticatedFoodsRouteImport } from './routes/_authenticated/foods'
 
 const AuthRoute = AuthRouteImport.update({
@@ -59,11 +58,6 @@ const AuthenticatedMoneyRoute = AuthenticatedMoneyRouteImport.update({
   path: '/money',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedGroceryRoute = AuthenticatedGroceryRouteImport.update({
-  id: '/grocery',
-  path: '/grocery',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedFoodsRoute = AuthenticatedFoodsRouteImport.update({
   id: '/foods',
   path: '/foods',
@@ -74,7 +68,6 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/auth': typeof AuthRoute
   '/foods': typeof AuthenticatedFoodsRoute
-  '/grocery': typeof AuthenticatedGroceryRoute
   '/money': typeof AuthenticatedMoneyRoute
   '/pantry': typeof AuthenticatedPantryRoute
   '/recipes': typeof AuthenticatedRecipesRoute
@@ -84,7 +77,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/foods': typeof AuthenticatedFoodsRoute
-  '/grocery': typeof AuthenticatedGroceryRoute
   '/money': typeof AuthenticatedMoneyRoute
   '/pantry': typeof AuthenticatedPantryRoute
   '/recipes': typeof AuthenticatedRecipesRoute
@@ -97,7 +89,6 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/_authenticated/foods': typeof AuthenticatedFoodsRoute
-  '/_authenticated/grocery': typeof AuthenticatedGroceryRoute
   '/_authenticated/money': typeof AuthenticatedMoneyRoute
   '/_authenticated/pantry': typeof AuthenticatedPantryRoute
   '/_authenticated/recipes': typeof AuthenticatedRecipesRoute
@@ -111,7 +102,6 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/foods'
-    | '/grocery'
     | '/money'
     | '/pantry'
     | '/recipes'
@@ -121,7 +111,6 @@ export interface FileRouteTypes {
   to:
     | '/auth'
     | '/foods'
-    | '/grocery'
     | '/money'
     | '/pantry'
     | '/recipes'
@@ -133,7 +122,6 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/_authenticated/foods'
-    | '/_authenticated/grocery'
     | '/_authenticated/money'
     | '/_authenticated/pantry'
     | '/_authenticated/recipes'
@@ -205,13 +193,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMoneyRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/grocery': {
-      id: '/_authenticated/grocery'
-      path: '/grocery'
-      fullPath: '/grocery'
-      preLoaderRoute: typeof AuthenticatedGroceryRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/foods': {
       id: '/_authenticated/foods'
       path: '/foods'
@@ -224,7 +205,6 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedFoodsRoute: typeof AuthenticatedFoodsRoute
-  AuthenticatedGroceryRoute: typeof AuthenticatedGroceryRoute
   AuthenticatedMoneyRoute: typeof AuthenticatedMoneyRoute
   AuthenticatedPantryRoute: typeof AuthenticatedPantryRoute
   AuthenticatedRecipesRoute: typeof AuthenticatedRecipesRoute
@@ -235,7 +215,6 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFoodsRoute: AuthenticatedFoodsRoute,
-  AuthenticatedGroceryRoute: AuthenticatedGroceryRoute,
   AuthenticatedMoneyRoute: AuthenticatedMoneyRoute,
   AuthenticatedPantryRoute: AuthenticatedPantryRoute,
   AuthenticatedRecipesRoute: AuthenticatedRecipesRoute,

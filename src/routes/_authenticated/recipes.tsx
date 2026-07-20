@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, ChefHat, ArrowLeft, GripVertical } from "lucide-react";
+import { Plus, Trash2, ChefHat, ArrowLeft, GripVertical, Search, ShoppingBag } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import {
   useRecipes, useUpsertRecipe, useDeleteRecipe, useRecipe,
   useRecipeIngredients, useUpsertIngredient, useDeleteIngredient,
-  useFoods, computeRecipeNutrition, perServing,
+  useFoods, usePantry, useUpsertTask,
+  computeRecipeNutrition, perServing, computePantryCoverage,
   type Recipe, type RecipeIngredient, type Food,
 } from "@/lib/atlas-data";
-import { UNIT_OPTIONS } from "@/lib/units";
+import { UNIT_OPTIONS, findMeasure } from "@/lib/units";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/recipes")({
@@ -30,7 +31,6 @@ function RecipesPage() {
 
 function RecipeList() {
   const recipes = useRecipes();
-  const upsert = useUpsertRecipe();
   const [dialog, setDialog] = useState<Partial<Recipe> | null>(null);
 
   return (
@@ -80,9 +80,11 @@ function RecipeDetail({ id }: { id: string }) {
   const recipe = useRecipe(id);
   const ingredients = useRecipeIngredients(id);
   const foods = useFoods();
+  const pantry = usePantry();
   const upsertIng = useUpsertIngredient();
   const delIng = useDeleteIngredient();
   const delRecipe = useDeleteRecipe();
+  const upsertTask = useUpsertTask();
   const [editRecipe, setEditRecipe] = useState<Partial<Recipe> | null>(null);
   const [editIng, setEditIng] = useState<Partial<RecipeIngredient> | null>(null);
 
@@ -97,9 +99,32 @@ function RecipeDetail({ id }: { id: string }) {
     [ingredients.data, foodsById],
   );
   const per = useMemo(() => perServing(totals, Number(recipe.data?.servings ?? 1)), [totals, recipe.data?.servings]);
+  const coverage = useMemo(
+    () => computePantryCoverage(ingredients.data ?? [], pantry.data ?? [], foodsById),
+    [ingredients.data, pantry.data, foodsById],
+  );
+
+  async function generateShoppingTasks() {
+    const missing = coverage.perIngredient.filter((p) => p.ratio < 1 && p.ingredient.food_id);
+    if (!missing.length) { toast.info("Pantry has everything for this recipe."); return; }
+    await Promise.all(missing.map((m) => {
+      const food = foodsById.get(m.ingredient.food_id!);
+      const title = `Buy ${food?.name ?? m.ingredient.name_override ?? "ingredient"}`;
+      return upsertTask.mutateAsync({
+        title,
+        kind: "shopping",
+        food_id: m.ingredient.food_id,
+        quantity: Number(m.ingredient.quantity),
+        unit: m.ingredient.unit,
+        priority: "normal",
+      });
+    }));
+    toast.success(`Added ${missing.length} shopping task${missing.length > 1 ? "s" : ""}`);
+  }
 
   if (recipe.isLoading || !recipe.data) return <p className="text-sm text-muted-foreground">Loading…</p>;
   const r = recipe.data;
+  const coveragePct = Math.round(coverage.coverage * 100);
 
   return (
     <div className="space-y-8">
@@ -119,6 +144,24 @@ function RecipeDetail({ id }: { id: string }) {
         </div>
       </header>
 
+      {/* Pantry coverage banner */}
+      <GlassCard className="border border-primary/20">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex-1">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-primary">Pantry availability</p>
+            <p className="mt-1 text-2xl font-semibold">{coveragePct}% ready</p>
+            <div className="mt-2 h-2 w-full max-w-md overflow-hidden rounded-full bg-white/5">
+              <div className={`h-full transition-all ${coveragePct >= 100 ? "bg-success" : "bg-primary"}`} style={{ width: `${coveragePct}%` }} />
+            </div>
+          </div>
+          {coveragePct < 100 && (
+            <Button variant="secondary" onClick={generateShoppingTasks}>
+              <ShoppingBag className="mr-1 size-4" /> Add missing to shopping
+            </Button>
+          )}
+        </div>
+      </GlassCard>
+
       <div className="grid gap-6 lg:grid-cols-3">
         <GlassCard className="lg:col-span-2">
           <div className="mb-4 flex items-center justify-between">
@@ -133,6 +176,8 @@ function RecipeDetail({ id }: { id: string }) {
             <div className="space-y-1">
               {(ingredients.data ?? []).map((ing) => {
                 const food = ing.food_id ? foodsById.get(ing.food_id) : undefined;
+                const cov = coverage.perIngredient.find((c) => c.ingredient.id === ing.id);
+                const ratioPct = cov ? Math.round(cov.ratio * 100) : 0;
                 return (
                   <button
                     key={ing.id}
@@ -145,6 +190,11 @@ function RecipeDetail({ id }: { id: string }) {
                       {food?.brand && <p className="text-[11px] text-muted-foreground">{food.brand}</p>}
                     </div>
                     <span className="font-mono text-xs text-muted-foreground">{ing.quantity} {ing.unit ?? ""}</span>
+                    {ing.food_id && (
+                      <span className={`ml-2 rounded-full px-2 py-0.5 font-mono text-[10px] ${ratioPct >= 100 ? "bg-success/20 text-success" : ratioPct > 0 ? "bg-warning/20 text-warning" : "bg-white/5 text-muted-foreground"}`}>
+                        {ratioPct}%
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -162,7 +212,7 @@ function RecipeDetail({ id }: { id: string }) {
           <h2 className="mb-4 text-lg font-semibold">Nutrition</h2>
           {totals.estimated && (
             <p className="mb-3 rounded-md border border-warning/30 bg-warning/5 px-3 py-2 text-[11px] text-warning">
-              Estimated — {totals.missing.length ? `missing/imprecise: ${totals.missing.slice(0, 3).join(", ")}${totals.missing.length > 3 ? "…" : ""}` : "unit conversions approximate"}
+              Estimated — {totals.missing.length ? `imprecise for: ${totals.missing.slice(0, 3).join(", ")}${totals.missing.length > 3 ? "…" : ""}` : "unit conversions approximate"}
             </p>
           )}
           <NutritionBlock label={`Per serving (${r.servings})`} n={per} />
@@ -253,35 +303,78 @@ function IngredientDialog({ open, initial, recipeId, foods, onClose, onSave, onD
   onDelete: (v: Partial<RecipeIngredient>) => void | Promise<void>;
 }) {
   const [form, setForm] = useState<Partial<RecipeIngredient>>({});
-  useEffect(() => { setForm(initial ?? { recipe_id: recipeId }); }, [initial, recipeId]);
+  const [foodQuery, setFoodQuery] = useState("");
+  useEffect(() => { setForm(initial ?? { recipe_id: recipeId }); setFoodQuery(""); }, [initial, recipeId]);
+
+  const linkedFood = form.food_id ? foods.find((f) => f.id === form.food_id) : undefined;
+  const matches = foodQuery ? foods.filter((f) => f.name.toLowerCase().includes(foodQuery.toLowerCase())).slice(0, 8) : [];
+
+  // Merge household-measure units from the linked food into unit dropdown.
+  const foodMeasures = (linkedFood?.household_measures as any[] | null) ?? [];
+  const measureUnits = Array.from(new Set(foodMeasures.map((m: any) => String(m.unit)).filter(Boolean)));
+  const currentMeasure = linkedFood && form.unit ? findMeasure(foodMeasures as any, form.unit) : undefined;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="glass-panel">
+      <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{initial?.id ? "Edit Ingredient" : "Add Ingredient"}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <Field label="Food">
-            <select
-              className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-              value={form.food_id ?? ""}
-              onChange={(e) => setForm({ ...form, food_id: e.target.value || null })}
-            >
-              <option value="">— free text —</option>
-              {foods.map((f) => <option key={f.id} value={f.id}>{f.name}{f.brand ? ` (${f.brand})` : ""}</option>)}
-            </select>
+            {linkedFood ? (
+              <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+                <div>
+                  <p className="text-sm font-medium">{linkedFood.name}</p>
+                  {linkedFood.brand && <p className="text-[11px] text-muted-foreground">{linkedFood.brand}</p>}
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => setForm({ ...form, food_id: null })}>Change</Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <Search className="size-4 text-muted-foreground" />
+                  <Input placeholder="Search saved foods…" value={foodQuery} onChange={(e) => setFoodQuery(e.target.value)} />
+                </div>
+                {matches.length > 0 && (
+                  <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-white/5 bg-white/5">
+                    {matches.map((f) => (
+                      <button key={f.id} className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-white/10"
+                        onClick={() => { setForm({ ...form, food_id: f.id }); setFoodQuery(""); }}>
+                        <span className="text-sm">{f.name}</span>
+                        {f.brand && <span className="text-[10px] text-muted-foreground">{f.brand}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-2">
+                  <Field label="Or free-text name">
+                    <Input value={form.name_override ?? ""} onChange={(e) => setForm({ ...form, name_override: e.target.value || null })} />
+                  </Field>
+                </div>
+              </>
+            )}
           </Field>
-          {!form.food_id && (
-            <Field label="Name (free text)"><Input value={form.name_override ?? ""} onChange={(e) => setForm({ ...form, name_override: e.target.value || null })} /></Field>
-          )}
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Quantity"><Input type="number" step="0.01" value={form.quantity ?? 1} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} /></Field>
             <Field label="Unit">
               <select className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={form.unit ?? ""} onChange={(e) => setForm({ ...form, unit: e.target.value || null })}>
                 <option value="">unit</option>
-                {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                {measureUnits.length > 0 && (
+                  <optgroup label="From this food">
+                    {measureUnits.map((u) => <option key={u} value={u}>{u}</option>)}
+                  </optgroup>
+                )}
+                <optgroup label="Standard">
+                  {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
+                </optgroup>
               </select>
             </Field>
           </div>
+          {currentMeasure && (
+            <p className="text-[11px] text-muted-foreground">
+              Using USDA measure: {currentMeasure.amount} {currentMeasure.unit} ≈ {currentMeasure.gramWeight} g
+            </p>
+          )}
           <Field label="Note"><Input value={form.note ?? ""} onChange={(e) => setForm({ ...form, note: e.target.value || null })} /></Field>
         </div>
         <DialogFooter className="gap-2">
