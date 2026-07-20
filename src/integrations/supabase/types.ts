@@ -152,10 +152,19 @@ export type Database = {
           fat_g: number | null
           fiber_g: number | null
           grams_per_serving: number | null
+          household_measures: Json
           id: string
           is_archived: boolean
+          n_calories: number | null
+          n_carbs_g: number | null
+          n_fat_g: number | null
+          n_fiber_g: number | null
+          n_protein_g: number | null
+          n_sodium_mg: number | null
+          n_sugar_g: number | null
           name: string
           notes: string | null
+          nutrient_basis: string
           protein_g: number | null
           serving_size: number | null
           serving_unit: string | null
@@ -163,6 +172,7 @@ export type Database = {
           source: Database["public"]["Enums"]["nutrition_source"]
           sugar_g: number | null
           updated_at: string
+          usda_data_type: string | null
           user_id: string
         }
         Insert: {
@@ -176,10 +186,19 @@ export type Database = {
           fat_g?: number | null
           fiber_g?: number | null
           grams_per_serving?: number | null
+          household_measures?: Json
           id?: string
           is_archived?: boolean
+          n_calories?: number | null
+          n_carbs_g?: number | null
+          n_fat_g?: number | null
+          n_fiber_g?: number | null
+          n_protein_g?: number | null
+          n_sodium_mg?: number | null
+          n_sugar_g?: number | null
           name: string
           notes?: string | null
+          nutrient_basis?: string
           protein_g?: number | null
           serving_size?: number | null
           serving_unit?: string | null
@@ -187,6 +206,7 @@ export type Database = {
           source?: Database["public"]["Enums"]["nutrition_source"]
           sugar_g?: number | null
           updated_at?: string
+          usda_data_type?: string | null
           user_id: string
         }
         Update: {
@@ -200,10 +220,19 @@ export type Database = {
           fat_g?: number | null
           fiber_g?: number | null
           grams_per_serving?: number | null
+          household_measures?: Json
           id?: string
           is_archived?: boolean
+          n_calories?: number | null
+          n_carbs_g?: number | null
+          n_fat_g?: number | null
+          n_fiber_g?: number | null
+          n_protein_g?: number | null
+          n_sodium_mg?: number | null
+          n_sugar_g?: number | null
           name?: string
           notes?: string | null
+          nutrient_basis?: string
           protein_g?: number | null
           serving_size?: number | null
           serving_unit?: string | null
@@ -211,65 +240,10 @@ export type Database = {
           source?: Database["public"]["Enums"]["nutrition_source"]
           sugar_g?: number | null
           updated_at?: string
+          usda_data_type?: string | null
           user_id?: string
         }
         Relationships: []
-      }
-      grocery_items: {
-        Row: {
-          category: string | null
-          created_at: string
-          id: string
-          is_checked: boolean
-          linked_pantry_item_id: string | null
-          name: string
-          notes: string | null
-          quantity: number
-          recurring: boolean
-          sort_order: number
-          unit: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string
-          id?: string
-          is_checked?: boolean
-          linked_pantry_item_id?: string | null
-          name: string
-          notes?: string | null
-          quantity?: number
-          recurring?: boolean
-          sort_order?: number
-          unit?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          category?: string | null
-          created_at?: string
-          id?: string
-          is_checked?: boolean
-          linked_pantry_item_id?: string | null
-          name?: string
-          notes?: string | null
-          quantity?: number
-          recurring?: boolean
-          sort_order?: number
-          unit?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "grocery_items_linked_pantry_item_id_fkey"
-            columns: ["linked_pantry_item_id"]
-            isOneToOne: false
-            referencedRelation: "pantry_items"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       pantry_items: {
         Row: {
@@ -464,14 +438,18 @@ export type Database = {
           completed_at: string | null
           created_at: string
           due_on: string | null
+          food_id: string | null
           id: string
           is_done: boolean
+          kind: Database["public"]["Enums"]["task_kind"]
           notes: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project: string | null
+          quantity: number | null
           recurrence: string | null
           sort_order: number
           title: string
+          unit: string | null
           updated_at: string
           user_id: string
         }
@@ -479,14 +457,18 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           due_on?: string | null
+          food_id?: string | null
           id?: string
           is_done?: boolean
+          kind?: Database["public"]["Enums"]["task_kind"]
           notes?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project?: string | null
+          quantity?: number | null
           recurrence?: string | null
           sort_order?: number
           title: string
+          unit?: string | null
           updated_at?: string
           user_id: string
         }
@@ -494,18 +476,30 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           due_on?: string | null
+          food_id?: string | null
           id?: string
           is_done?: boolean
+          kind?: Database["public"]["Enums"]["task_kind"]
           notes?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project?: string | null
+          quantity?: number | null
           recurrence?: string | null
           sort_order?: number
           title?: string
+          unit?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       transactions: {
         Row: {
@@ -648,6 +642,7 @@ export type Database = {
       nutrition_source: "usda" | "manual" | "barcode" | "imported"
       privacy_mode: "private" | "guest" | "wall"
       storage_location: "pantry" | "fridge" | "freezer" | "other"
+      task_kind: "general" | "shopping"
       task_priority: "low" | "normal" | "high"
       txn_type: "expense" | "income" | "transfer"
     }
@@ -791,6 +786,7 @@ export const Constants = {
       nutrition_source: ["usda", "manual", "barcode", "imported"],
       privacy_mode: ["private", "guest", "wall"],
       storage_location: ["pantry", "fridge", "freezer", "other"],
+      task_kind: ["general", "shopping"],
       task_priority: ["low", "normal", "high"],
       txn_type: ["expense", "income", "transfer"],
     },
