@@ -317,12 +317,10 @@ export function useApplyFunRollover() {
       const toVac = (leftover * vacPct) / 100;
       const toSts = (leftover * stsPct) / 100;
 
-      const updates: Promise<any>[] = [];
-      updates.push(supabase.from("budget_categories").update({ rollover_balance: toFun }).eq("id", fun.id));
-      if (vac) updates.push(supabase.from("budget_categories").update({ rollover_balance: Number(vac.rollover_balance) + toVac }).eq("id", vac.id));
-      if (sts) updates.push(supabase.from("budget_categories").update({ rollover_balance: Number(sts.rollover_balance) + toSts }).eq("id", sts.id));
-      updates.push(supabase.from("finance_settings").upsert({ user_id, last_month_closed: prevKey }));
-      await Promise.all(updates);
+      await supabase.from("budget_categories").update({ rollover_balance: toFun }).eq("id", fun.id);
+      if (vac) await supabase.from("budget_categories").update({ rollover_balance: Number(vac.rollover_balance) + toVac }).eq("id", vac.id);
+      if (sts) await supabase.from("budget_categories").update({ rollover_balance: Number(sts.rollover_balance) + toSts }).eq("id", sts.id);
+      await supabase.from("finance_settings").upsert({ user_id, last_month_closed: prevKey });
       return { leftover, toFun, toVac, toSts };
     },
     onSuccess: (r) => {
