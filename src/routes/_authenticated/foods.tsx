@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Plus, Search, Trash2, Utensils, Loader2, Check } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
+import { FoodTabs } from "@/components/atlas/FoodTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
