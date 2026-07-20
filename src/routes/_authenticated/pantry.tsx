@@ -28,8 +28,18 @@ const LOCATIONS = ["pantry", "fridge", "freezer", "other"] as const;
 function PantryPage() {
   const items = usePantry();
   const foods = useFoods();
+  const backfill = useBackfillPantryFoods();
   const [dialog, setDialog] = useState<Partial<PantryItem> | null>(null);
   const [filter, setFilter] = useState<string>("all");
+
+  // Auto-link legacy pantry items to the Food Library once, after data loads.
+  useEffect(() => {
+    if (!items.data || items.data.length === 0) return;
+    if (backfill.isPending || backfill.isSuccess || backfill.isError) return;
+    const unlinked = items.data.some((i) => !i.food_id && i.name?.trim());
+    if (unlinked) backfill.mutate();
+  }, [items.data, backfill]);
+
 
   const foodsById = useMemo(() => {
     const m = new Map<string, Food>();
