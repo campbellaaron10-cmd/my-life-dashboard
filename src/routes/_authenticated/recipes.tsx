@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, ChefHat, ArrowLeft, GripVertical, Search, ShoppingBag } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
+import { FoodTabs } from "@/components/atlas/FoodTabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
