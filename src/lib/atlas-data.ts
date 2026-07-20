@@ -14,6 +14,9 @@ export type PantryItem = Tables["pantry_items"]["Row"];
 export type GroceryItem = Tables["grocery_items"]["Row"];
 export type Task = Tables["tasks"]["Row"];
 export type ActivityEvent = Tables["activity_events"]["Row"];
+export type Food = Tables["foods"]["Row"];
+export type Recipe = Tables["recipes"]["Row"];
+export type RecipeIngredient = Tables["recipe_ingredients"]["Row"];
 
 export const qk = {
   accounts: ["accounts"] as const,
