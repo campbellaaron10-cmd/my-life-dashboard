@@ -26,6 +26,9 @@ export const qk = {
   grocery: ["grocery_items"] as const,
   tasks: ["tasks"] as const,
   activity: ["activity_events"] as const,
+  foods: ["foods"] as const,
+  recipes: ["recipes"] as const,
+  recipeIngredients: (recipeId: string) => ["recipe_ingredients", recipeId] as const,
 };
 
 async function currentUserId() {
