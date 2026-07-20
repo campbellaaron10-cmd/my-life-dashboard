@@ -92,10 +92,21 @@ export const searchUsdaFoods = createServerFn({ method: "POST" })
 export const getUsdaFood = createServerFn({ method: "POST" })
   .inputValidator((data: { fdcId: number }) => data)
   .handler(async ({ data }): Promise<UsdaFoodNormalized> => {
-    const url = `${BASE}/food/${data.fdcId}?api_key=${apiKey()}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`USDA lookup failed: ${res.status}`);
-    const f = (await res.json()) as any;
+    // Try the single-food endpoint first; some fdcIds (esp. Survey/FNDDS) only
+    // resolve via the batch /foods endpoint, so fall back before failing.
+    let f: any;
+    const single = await fetch(`${BASE}/food/${data.fdcId}?api_key=${apiKey()}`);
+    if (single.ok) {
+      f = await single.json();
+    } else if (single.status === 404) {
+      const batch = await fetch(`${BASE}/foods?fdcIds=${data.fdcId}&api_key=${apiKey()}`);
+      if (!batch.ok) throw new Error(`USDA lookup failed: ${batch.status}`);
+      const arr = (await batch.json()) as any[];
+      f = arr?.[0];
+      if (!f) throw new Error(`USDA food ${data.fdcId} not found. Try a different result.`);
+    } else {
+      throw new Error(`USDA lookup failed: ${single.status}`);
+    }
 
     // Determine basis: solids default to per_100g; liquid servings (ml/l/fl oz) → per_100ml.
     const rawUnit = (f.servingSizeUnit || "").toLowerCase();
