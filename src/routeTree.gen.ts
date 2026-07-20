@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedWeatherRouteImport } from './routes/_authenticated/weather'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedPantryRouteImport } from './routes/_authenticated/pantry'
 import { Route as AuthenticatedMoneyRouteImport } from './routes/_authenticated/money'
@@ -29,6 +30,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedWeatherRoute = AuthenticatedWeatherRouteImport.update({
+  id: '/weather',
+  path: '/weather',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTasksRoute = AuthenticatedTasksRouteImport.update({
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/money': typeof AuthenticatedMoneyRoute
   '/pantry': typeof AuthenticatedPantryRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/weather': typeof AuthenticatedWeatherRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/money': typeof AuthenticatedMoneyRoute
   '/pantry': typeof AuthenticatedPantryRoute
   '/tasks': typeof AuthenticatedTasksRoute
+  '/weather': typeof AuthenticatedWeatherRoute
   '/': typeof AuthenticatedIndexRoute
 }
 export interface FileRoutesById {
@@ -76,13 +84,21 @@ export interface FileRoutesById {
   '/_authenticated/money': typeof AuthenticatedMoneyRoute
   '/_authenticated/pantry': typeof AuthenticatedPantryRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
+  '/_authenticated/weather': typeof AuthenticatedWeatherRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/grocery' | '/money' | '/pantry' | '/tasks'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/grocery'
+    | '/money'
+    | '/pantry'
+    | '/tasks'
+    | '/weather'
   fileRoutesByTo: FileRoutesByTo
-  to: '/auth' | '/grocery' | '/money' | '/pantry' | '/tasks' | '/'
+  to: '/auth' | '/grocery' | '/money' | '/pantry' | '/tasks' | '/weather' | '/'
   id:
     | '__root__'
     | '/_authenticated'
@@ -91,6 +107,7 @@ export interface FileRouteTypes {
     | '/_authenticated/money'
     | '/_authenticated/pantry'
     | '/_authenticated/tasks'
+    | '/_authenticated/weather'
     | '/_authenticated/'
   fileRoutesById: FileRoutesById
 }
@@ -120,6 +137,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/weather': {
+      id: '/_authenticated/weather'
+      path: '/weather'
+      fullPath: '/weather'
+      preLoaderRoute: typeof AuthenticatedWeatherRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/tasks': {
@@ -158,6 +182,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMoneyRoute: typeof AuthenticatedMoneyRoute
   AuthenticatedPantryRoute: typeof AuthenticatedPantryRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
+  AuthenticatedWeatherRoute: typeof AuthenticatedWeatherRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
 }
 
@@ -166,6 +191,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMoneyRoute: AuthenticatedMoneyRoute,
   AuthenticatedPantryRoute: AuthenticatedPantryRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
+  AuthenticatedWeatherRoute: AuthenticatedWeatherRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
 }
 
