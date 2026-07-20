@@ -323,6 +323,67 @@ export function useDeleteFood() {
   });
 }
 
+/**
+ * Find-or-create a Food from a normalized USDA payload.
+ * Dedupes on (user_id, source='usda', external_id=fdcId).
+ * Returns the Food row (existing or newly inserted).
+ */
+export function useImportUsdaFood() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: {
+      fdcId: number;
+      name: string;
+      brand?: string | null;
+      dataType?: string | null;
+      nutrient_basis: "per_100g" | "per_100ml";
+      n_calories?: number | null;
+      n_protein_g?: number | null;
+      n_carbs_g?: number | null;
+      n_fat_g?: number | null;
+      n_fiber_g?: number | null;
+      n_sugar_g?: number | null;
+      n_sodium_mg?: number | null;
+      serving_size?: number | null;
+      serving_unit?: string | null;
+      grams_per_serving?: number | null;
+      household_measures: HouseholdMeasure[];
+    }) => {
+      const user_id = await currentUserId();
+      const fdcStr = String(payload.fdcId);
+      const existing = await supabase
+        .from("foods").select("*")
+        .eq("user_id", user_id).eq("source", "usda").eq("external_id", fdcStr)
+        .maybeSingle();
+      if (existing.data) return existing.data as Food;
+      const insert = await supabase.from("foods").insert({
+        user_id,
+        name: payload.name,
+        brand: payload.brand ?? null,
+        source: "usda",
+        external_id: fdcStr,
+        usda_data_type: payload.dataType ?? null,
+        nutrient_basis: payload.nutrient_basis,
+        n_calories: payload.n_calories ?? null,
+        n_protein_g: payload.n_protein_g ?? null,
+        n_carbs_g: payload.n_carbs_g ?? null,
+        n_fat_g: payload.n_fat_g ?? null,
+        n_fiber_g: payload.n_fiber_g ?? null,
+        n_sugar_g: payload.n_sugar_g ?? null,
+        n_sodium_mg: payload.n_sodium_mg ?? null,
+        serving_size: payload.serving_size ?? null,
+        serving_unit: payload.serving_unit ?? null,
+        grams_per_serving: payload.grams_per_serving ?? null,
+        household_measures: payload.household_measures as any,
+      }).select().single();
+      if (insert.error) throw insert.error;
+      return insert.data as Food;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.foods }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 // ---------- Recipes ----------
 export function useRecipes() {
   return useQuery({
