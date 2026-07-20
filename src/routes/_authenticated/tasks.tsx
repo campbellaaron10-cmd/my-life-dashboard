@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, CheckSquare, Flag } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -127,7 +127,7 @@ function Group({ title, items, onEdit, onDelete, onToggle, muted }: {
 function TaskDialog({ open, initial, onClose }: { open: boolean; initial: Partial<Task> | null; onClose: () => void }) {
   const upsert = useUpsertTask();
   const [form, setForm] = useState<Partial<Task>>({});
-  useMemo(() => setForm(initial ?? {}), [initial]);
+  useEffect(() => { setForm(initial ?? {}); }, [initial]);
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="glass-panel">

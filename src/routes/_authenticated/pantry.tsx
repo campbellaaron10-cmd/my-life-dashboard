@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, AlertTriangle, Refrigerator } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -102,7 +102,7 @@ function PantryDialog({ open, initial, onClose }: { open: boolean; initial: Part
   const upsert = useUpsertPantry();
   const del = useDeletePantry();
   const [form, setForm] = useState<Partial<PantryItem>>({});
-  useMemo(() => setForm(initial ?? {}), [initial]);
+  useEffect(() => { setForm(initial ?? {}); }, [initial]);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>

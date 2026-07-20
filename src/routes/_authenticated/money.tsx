@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Pencil, Wallet, TrendingUp, TrendingDown } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -231,7 +231,7 @@ function AccountDialog({ open, initial, onClose }: { open: boolean; initial: Par
   const upsert = useUpsertAccount();
   const del = useDeleteAccount();
   const [form, setForm] = useState<Partial<Account>>({});
-  useMemo(() => setForm(initial ?? {}), [initial]);
+  useEffect(() => { setForm(initial ?? {}); }, [initial]);
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="glass-panel">
@@ -262,7 +262,7 @@ function TxnDialog({ open, initial, accounts, categories, onClose }: { open: boo
   const upsert = useUpsertTransaction();
   const del = useDeleteTransaction();
   const [form, setForm] = useState<Partial<Transaction>>({});
-  useMemo(() => setForm(initial ?? {}), [initial]);
+  useEffect(() => { setForm(initial ?? {}); }, [initial]);
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="glass-panel">
@@ -312,7 +312,7 @@ function BudgetDialog({ open, initial, onClose }: { open: boolean; initial: Part
   const upsert = useUpsertBudget();
   const del = useDeleteBudget();
   const [form, setForm] = useState<Partial<BudgetCategory>>({});
-  useMemo(() => setForm(initial ?? {}), [initial]);
+  useEffect(() => { setForm(initial ?? {}); }, [initial]);
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="glass-panel">
