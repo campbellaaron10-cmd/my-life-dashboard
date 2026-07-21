@@ -159,18 +159,46 @@ function FinancesDashboard() {
     [allTxns, monthStart, nextMonthStart],
   );
 
-  // Prior-month summary drives this month's budget per workbook rule:
-  //    budget = prior month income − prior month housing.
+  // Current-month budget comes from the stored monthly summary created when
+  // the prior month was closed. Do NOT invent one from prior income/housing —
+  // the workbook rule is applied by the Close-Month workflow, not here.
   const priorSummary = allSummaries.find((s) => s.month === prevMonthKey);
   const currentSummary = allSummaries.find((s) => s.month === curMonthKey);
-  const monthlyBudget = currentSummary
-    ? Number(currentSummary.budget)
-    : priorSummary
-      ? Math.max(0, Number(priorSummary.income) - Number(priorSummary.housing))
-      : 0;
+  const monthlyBudget = currentSummary ? Number(currentSummary.budget) : 0;
+  const budgetIsSet = !!currentSummary;
 
-  const totalAllocated = allBudgets.reduce((s, b) => s + Number(b.monthly_limit), 0);
-  const unallocated = monthlyBudget - totalAllocated;
+  // Contribution this month, per category: sum of savings_contribution /
+  // investment_contribution transactions tagged to that category.
+  const contributionByCat = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of allTxns) {
+      if (!t.category_id) continue;
+      if (t.type !== "savings_contribution" && t.type !== "investment_contribution") continue;
+      const d = new Date(t.occurred_on);
+      if (d < monthStart || d >= nextMonthStart) continue;
+      map.set(t.category_id, (map.get(t.category_id) ?? 0) + Number(t.amount));
+    }
+    return map;
+  }, [allTxns, monthStart, nextMonthStart]);
+
+  // Cumulative balance per savings/investment code — sourced from the latest
+  // monthly summary. Never treated as a current-month allocation.
+  const latestSummary = allSummaries.at(-1);
+  const balanceByCode: Record<string, number> = {
+    STS: Number(latestSummary?.sts_balance ?? 0),
+    VAC: Number(latestSummary?.vac_balance ?? 0),
+    LTS: Number(latestSummary?.lts_balance ?? 0),
+    FED: Number(latestSummary?.fed_balance ?? 0),
+    RSU: Number((latestSummary as any)?.rsu_balance ?? 0),
+  };
+
+  // "Allocated this month" only counts spending categories. Cumulative
+  // balances on savings/investment categories must not inflate this number.
+  const spendingAllocated = allBudgets
+    .filter((b) => b.kind === "spending")
+    .reduce((s, b) => s + Number(b.monthly_limit), 0);
+  const remainingToAllocate = monthlyBudget - spendingAllocated;
+
 
   const findAcc = (nameFragment: string) =>
     allAccounts.find((a) => a.name.toLowerCase().includes(nameFragment.toLowerCase()));
