@@ -361,7 +361,67 @@ export function useApplyFunRollover() {
   });
 }
 
-// ---------- Pantry ----------
+// ---------- Monthly summaries (Excel workbook rows → DB) ----------
+export function useMonthlySummaries() {
+  return useQuery({
+    queryKey: qk.monthlySummaries,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("monthly_summaries").select("*").order("month");
+      if (error) throw error;
+      return data as MonthlySummary[];
+    },
+  });
+}
+
+export function useUpsertMonthlySummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<MonthlySummary> & { month: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase.from("monthly_summaries")
+        .upsert({ ...input, user_id }, { onConflict: "user_id,month" }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.monthlySummaries }); toast.success("Month saved"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteMonthlySummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("monthly_summaries").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.monthlySummaries }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/** Bulk import rows from the Excel import wizard. Deduped by (user_id, month). */
+export function useBulkImportMonthlySummaries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: Partial<MonthlySummary>[]) => {
+      const user_id = await currentUserId();
+      const scoped = rows.map((r) => ({ ...r, user_id, source: r.source ?? "excel_import" }));
+      const { data, error } = await supabase.from("monthly_summaries")
+        .upsert(scoped as any, { onConflict: "user_id,month" }).select();
+      if (error) throw error;
+      return data ?? [];
+    },
+    onSuccess: (rows) => {
+      qc.invalidateQueries({ queryKey: qk.monthlySummaries });
+      toast.success(`Imported ${rows.length} month${rows.length === 1 ? "" : "s"}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+
 export function usePantry(opts?: UseQueryOptions<PantryItem[]>) {
   return useQuery<PantryItem[]>({
     queryKey: qk.pantry,
