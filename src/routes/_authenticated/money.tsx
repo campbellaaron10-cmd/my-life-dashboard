@@ -881,6 +881,8 @@ function MonthDialog({ open, initial, onClose }: { open: boolean; initial: Parti
           <Field label="Long-Term Savings balance">{num("lts_balance")}</Field>
           <Field label="Fidelity balance">{num("fed_balance")}</Field>
           <Field label="Fidelity earnings">{num("fed_earnings")}</Field>
+          <Field label="RSU balance">{num("rsu_balance" as any)}</Field>
+          <Field label="RSU vested this month">{num("rsu_contribution" as any)}</Field>
           <Field label="Regions balance">{num("regions_balance")}</Field>
         </div>
         <DialogFooter className="gap-2">
