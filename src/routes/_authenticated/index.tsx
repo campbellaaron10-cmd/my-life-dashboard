@@ -35,9 +35,22 @@ function pickGreeting() {
   const h = new Date().getHours();
   const bucket = h < 5 ? "evening" : h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
   const pool = GREETINGS[bucket];
-  // Stable-per-hour randomness so the greeting doesn't reshuffle every render.
   const seed = Math.floor(Date.now() / (1000 * 60 * 60));
   return pool[seed % pool.length];
+}
+
+// --- Rotating header status ---------------------------------------------
+const STATUS_MESSAGES = [
+  "ATLAS ONLINE", "ATLAS AWAKE", "SYSTEM READY", "STANDING BY", "READY",
+  "OPERATIONAL", "CONNECTION ESTABLISHED", "READY FOR TODAY",
+  "Welcome back.", "Good to see you again.", "Ready when you are.", "Let's get organized.",
+  "Awaiting Instructions", "Monitoring Active", "Command Link Established",
+  "Atlas has been expecting you.", "Welcome home.", "Another successful boot.",
+  "Everything's where you left it.", "Your life, organized.", "One dashboard. Everything else.",
+];
+
+function pickStatus() {
+  return STATUS_MESSAGES[Math.floor(Math.random() * STATUS_MESSAGES.length)];
 }
 
 const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -60,6 +73,10 @@ function Dashboard() {
   const { mode } = usePrivacyMode();
   const finance = useFinanceSummary();
 
+  // Rotating boot-up status — stable for the life of this dashboard mount.
+  const status = useMemo(() => pickStatus(), []);
+  const greeting = useMemo(() => pickGreeting(), []);
+
   // ---- Derived (kept small; only what the widgets need) ----
   const expiring = useMemo(() =>
     (pantry.data ?? [])
@@ -73,7 +90,7 @@ function Dashboard() {
   const todayTasks = openTasks.filter((t) => t.kind !== "shopping").slice(0, 5);
   const shopping = openTasks.filter((t) => t.kind === "shopping");
 
-  // ---- Atlas Briefing: dynamic, high-signal only ----
+  // ---- Atlas Briefing: actionable, time-sensitive, or anomalous only ----
   const briefing = useMemo(() => {
     const items: { text: string; tone?: "warn" | "info" | "good" }[] = [];
     const now = new Date();
@@ -82,13 +99,12 @@ function Dashboard() {
     const monthProgress = dayOfMonth / daysInMonth;
 
     if (mode === "private") {
-      // Spending pace: only flag when spent% outpaces month progress by >20pts
-      // AND we're past day 3 (avoid noise early in the month).
-      if (dayOfMonth > 3 && finance.monthlyBudget > 0) {
+      // Budget pace: only for categories with a valid allocation > 0, after day 3.
+      if (dayOfMonth > 3) {
         for (const code of ["HOU", "ESS", "FUN"] as const) {
-          const spent = finance.spentByCode[code] ?? 0;
           const alloc = finance.allocByCode[code] ?? 0;
-          if (alloc <= 0) continue;
+          if (alloc <= 0) continue; // no configured allocation → skip silently
+          const spent = finance.spentByCode[code] ?? 0;
           const spentPct = spent / alloc;
           if (spentPct >= 0.95) {
             items.push({ text: `${CATEGORY_LABELS[code].long} nearly spent — ${Math.round(spentPct * 100)}% of allocation.`, tone: "warn" });
@@ -97,23 +113,15 @@ function Dashboard() {
           }
         }
       }
-      // Savings milestone: check if VAC/STS crossed a $500 threshold vs prior month.
-      const prior = finance.summaries.at(-2);
-      const latest = finance.summaries.at(-1);
-      if (prior && latest) {
-        for (const [code, key] of [
-          ["VAC", "vac_balance"], ["STS", "sts_balance"], ["LTS", "lts_balance"], ["FED", "fed_balance"],
-        ] as const) {
-          const p = Math.floor(Number((prior as any)[key] ?? 0) / 500);
-          const l = Math.floor(Number((latest as any)[key] ?? 0) / 500);
-          if (l > p) {
-            items.push({ text: `${CATEGORY_LABELS[code].long} passed ${fmt(l * 500)}.`, tone: "good" });
-          }
-        }
+      // Month-close reminder: prior month has no summary yet.
+      const priorKey = `${new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10).replace(/-\d{2}$/, "-01")}`;
+      const hasPrior = finance.summaries.some((s) => s.month === priorKey);
+      if (!hasPrior && finance.summaries.length > 0) {
+        items.push({ text: `${finance.priorMonthLabel} hasn't been closed yet.`, tone: "info" });
       }
     }
 
-    // Pantry: only 0–2 day windows
+    // Pantry: 0–2 day windows
     const urgent = expiring.filter((e) => (e.days ?? 99) <= 2);
     if (urgent.length) {
       const first = urgent[0];
@@ -152,8 +160,8 @@ function Dashboard() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Command Center</p>
-          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">{pickGreeting()}</h1>
+          <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">{status}</p>
+          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">{greeting}</h1>
         </div>
         <Link to="/weather" className="text-right transition-opacity hover:opacity-80">
           <p className="flex items-center justify-end gap-2 text-4xl font-light tracking-tight">
@@ -206,19 +214,19 @@ function Dashboard() {
           }
         >
           <GlassCard className="col-span-12 lg:col-span-8">
-            <div className="mb-6 flex items-start justify-between gap-4">
+            <div className="mb-4 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold">Financial Core</h2>
+                <h2 className="text-xl font-semibold">Financial Core</h2>
                 <Link to="/money" className="text-xs text-primary hover:underline">Open Finances →</Link>
               </div>
               <div className="text-right">
-                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Net Worth</p>
-                <p className="font-mono text-3xl font-bold">{fmt(finance.netWorth)}</p>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Net Worth</p>
+                <p className="font-mono text-2xl font-bold">{fmt(finance.netWorth)}</p>
               </div>
             </div>
 
-            {/* Key metrics grid */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {/* Primary: budget & remaining */}
+            <div className="grid grid-cols-2 gap-3">
               <MetricTile
                 label="Current Budget"
                 value={finance.budgetIsSet ? fmt(finance.monthlyBudget) : "—"}
@@ -230,52 +238,27 @@ function Dashboard() {
                 hint={finance.budgetIsSet ? `${fmt(finance.monthlySpent)} spent` : ""}
                 accent={finance.remainingBudget < 0 ? "var(--warning, #f59e0b)" : undefined}
               />
-              <MetricTile
-                label="Vacation Fund"
-                sub="VAC"
-                value={fmt(finance.balanceByCode.VAC)}
-                accent={SERIES_COLOR.VAC}
-              />
-              <MetricTile
-                label="Short-Term Savings"
-                sub="STS"
-                value={fmt(finance.balanceByCode.STS)}
-                accent={SERIES_COLOR.STS}
-              />
-              <MetricTile
-                label="Fidelity"
-                sub="FED"
-                value={fmt(finance.balanceByCode.FED)}
-                accent={SERIES_COLOR.FED}
-              />
-              <MetricTile
-                label="Long-Term Savings"
-                sub="LTS"
-                value={fmt(finance.balanceByCode.LTS)}
-                accent={SERIES_COLOR.LTS}
-              />
-              <MetricTile
-                label="Restricted Stock"
-                sub="RSU"
-                value={fmt(finance.balanceByCode.RSU)}
-                accent={SERIES_COLOR.RSU}
-              />
-              <MetricTile
-                label="Regions Checking"
-                value={fmt(finance.balanceByCode.Regions)}
-                accent={SERIES_COLOR.Regions}
-              />
             </div>
 
-            {/* Compact growth chart */}
-            <Link to="/money" className="mt-6 block rounded-2xl border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="flex items-center gap-2 text-sm font-medium">
-                  <LineChartIcon className="size-4" /> Investment &amp; Savings Growth
+            {/* Secondary: compact balance chips */}
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <BalanceChip label="Vacation" sub="VAC" value={fmt(finance.balanceByCode.VAC)} color={SERIES_COLOR.VAC} />
+              <BalanceChip label="Short-Term" sub="STS" value={fmt(finance.balanceByCode.STS)} color={SERIES_COLOR.STS} />
+              <BalanceChip label="Fidelity" sub="FED" value={fmt(finance.balanceByCode.FED)} color={SERIES_COLOR.FED} />
+              <BalanceChip label="Long-Term" sub="LTS" value={fmt(finance.balanceByCode.LTS)} color={SERIES_COLOR.LTS} />
+              <BalanceChip label="RSU" sub="RSU" value={fmt(finance.balanceByCode.RSU)} color={SERIES_COLOR.RSU} />
+              <BalanceChip label="Regions" sub="CHK" value={fmt(finance.balanceByCode.Regions)} color={SERIES_COLOR.Regions} />
+            </div>
+
+            {/* Compact embedded chart */}
+            <Link to="/money" className="mt-4 block rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                  <LineChartIcon className="size-3" /> Investment & Savings Growth
                 </p>
-                <span className="text-xs text-primary">Open full chart →</span>
+                <span className="text-[10px] text-primary">Open chart →</span>
               </div>
-              <FinanceMiniChart summaries={finance.summaries} />
+              <FinanceMiniChart summaries={finance.summaries} compact />
             </Link>
           </GlassCard>
         </PrivacyGuard>
@@ -421,5 +404,20 @@ function EmptyLink({ to, icon: Icon, text }: { to: string; icon?: typeof Wallet;
       {Icon ? <Icon className="size-8 opacity-40" /> : null}
       <p>{text}</p>
     </Link>
+  );
+}
+
+function BalanceChip({ label, sub, value, color }: { label: string; sub: string; value: string; color: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="size-1.5 rounded-full" style={{ background: color }} />
+          <p className="truncate text-[11px] text-muted-foreground">{label}</p>
+        </div>
+        <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">{sub}</p>
+      </div>
+      <p className="font-mono text-sm font-semibold tracking-tight">{value}</p>
+    </div>
   );
 }
