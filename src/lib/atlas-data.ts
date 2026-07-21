@@ -32,6 +32,7 @@ export const qk = {
   recipeIngredients: (recipeId: string) => ["recipe_ingredients", recipeId] as const,
   financeSettings: ["finance_settings"] as const,
   balanceSnapshots: ["balance_snapshots"] as const,
+  monthlySummaries: ["monthly_summaries"] as const,
 };
 
 async function currentUserId() {
