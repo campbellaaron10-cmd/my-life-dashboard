@@ -159,18 +159,46 @@ function FinancesDashboard() {
     [allTxns, monthStart, nextMonthStart],
   );
 
-  // Prior-month summary drives this month's budget per workbook rule:
-  //    budget = prior month income − prior month housing.
+  // Current-month budget comes from the stored monthly summary created when
+  // the prior month was closed. Do NOT invent one from prior income/housing —
+  // the workbook rule is applied by the Close-Month workflow, not here.
   const priorSummary = allSummaries.find((s) => s.month === prevMonthKey);
   const currentSummary = allSummaries.find((s) => s.month === curMonthKey);
-  const monthlyBudget = currentSummary
-    ? Number(currentSummary.budget)
-    : priorSummary
-      ? Math.max(0, Number(priorSummary.income) - Number(priorSummary.housing))
-      : 0;
+  const monthlyBudget = currentSummary ? Number(currentSummary.budget) : 0;
+  const budgetIsSet = !!currentSummary;
 
-  const totalAllocated = allBudgets.reduce((s, b) => s + Number(b.monthly_limit), 0);
-  const unallocated = monthlyBudget - totalAllocated;
+  // Contribution this month, per category: sum of savings_contribution /
+  // investment_contribution transactions tagged to that category.
+  const contributionByCat = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const t of allTxns) {
+      if (!t.category_id) continue;
+      if (t.type !== "savings_contribution" && t.type !== "investment_contribution") continue;
+      const d = new Date(t.occurred_on);
+      if (d < monthStart || d >= nextMonthStart) continue;
+      map.set(t.category_id, (map.get(t.category_id) ?? 0) + Number(t.amount));
+    }
+    return map;
+  }, [allTxns, monthStart, nextMonthStart]);
+
+  // Cumulative balance per savings/investment code — sourced from the latest
+  // monthly summary. Never treated as a current-month allocation.
+  const latestSummary = allSummaries.at(-1);
+  const balanceByCode: Record<string, number> = {
+    STS: Number(latestSummary?.sts_balance ?? 0),
+    VAC: Number(latestSummary?.vac_balance ?? 0),
+    LTS: Number(latestSummary?.lts_balance ?? 0),
+    FED: Number(latestSummary?.fed_balance ?? 0),
+    RSU: Number((latestSummary as any)?.rsu_balance ?? 0),
+  };
+
+  // "Allocated this month" only counts spending categories. Cumulative
+  // balances on savings/investment categories must not inflate this number.
+  const spendingAllocated = allBudgets
+    .filter((b) => b.kind === "spending")
+    .reduce((s, b) => s + Number(b.monthly_limit), 0);
+  const remainingToAllocate = monthlyBudget - spendingAllocated;
+
 
   const findAcc = (nameFragment: string) =>
     allAccounts.find((a) => a.name.toLowerCase().includes(nameFragment.toLowerCase()));
@@ -179,12 +207,12 @@ function FinancesDashboard() {
   const lts = findAcc("401") ?? allAccounts.find((a) => a.type === "retirement");
   const rsu = findAcc("rsu") ?? findAcc("stock");
 
-  // Balances: prefer live account balances, fall back to latest monthly summary from Excel.
-  const latestSummary = allSummaries.at(-1);
+  // Live account balances (with monthly-summary fallback derived above).
   const regionsBal = regions ? accountBalance(regions, allTxns) : Number(latestSummary?.regions_balance ?? 0);
-  const fedBal = fidelity ? accountBalance(fidelity, allTxns) : Number(latestSummary?.fed_balance ?? 0);
-  const ltsBal = lts ? accountBalance(lts, allTxns) : Number(latestSummary?.lts_balance ?? 0);
-  const rsuBal = rsu ? accountBalance(rsu, allTxns) : Number((latestSummary as any)?.rsu_balance ?? 0);
+  const fedBal = fidelity ? accountBalance(fidelity, allTxns) : balanceByCode.FED;
+  const ltsBal = lts ? accountBalance(lts, allTxns) : balanceByCode.LTS;
+  const rsuBal = rsu ? accountBalance(rsu, allTxns) : balanceByCode.RSU;
+
 
   const empty = allBudgets.length === 0 && allAccounts.length === 0 && allSummaries.length === 0;
 
@@ -256,10 +284,12 @@ function FinancesDashboard() {
         />
         <MonthlyBudgetCard
           budget={monthlyBudget}
-          allocated={totalAllocated}
+          budgetIsSet={budgetIsSet}
+          allocated={spendingAllocated}
           spent={monthlySpent}
           nextMonthIncome={monthlyIncome}
         />
+
       </div>
 
 
@@ -269,7 +299,7 @@ function FinancesDashboard() {
           <div>
             <h2 className="text-xl font-semibold">This month</h2>
             <p className="text-sm text-muted-foreground">
-              Budget {fmt(monthlyBudget)} · Allocated {fmt(totalAllocated)} · Spent {fmt(monthlySpent)} · Unallocated {fmt(unallocated)}
+              Budget {fmt(monthlyBudget)} · Allocated {fmt(spendingAllocated)} · Spent {fmt(monthlySpent)} · Remaining to allocate {fmt(remainingToAllocate)}
             </p>
           </div>
           <div className="flex gap-2">
@@ -287,8 +317,16 @@ function FinancesDashboard() {
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
             {allBudgets.map((c) => (
-              <BudgetRow key={c.id} cat={c} txns={allTxns} onEdit={() => setBudgetDialog(c)} />
+              <BudgetRow
+                key={c.id}
+                cat={c}
+                txns={allTxns}
+                contribution={contributionByCat.get(c.id) ?? 0}
+                balance={balanceByCode[c.code] ?? 0}
+                onEdit={() => setBudgetDialog(c)}
+              />
             ))}
+
           </div>
         )}
       </GlassCard>
@@ -454,47 +492,90 @@ function StatTile({ label, sub, value, hint, onClick, accent }: { label: string;
   );
 }
 
-function MonthlyBudgetCard({ budget, allocated, spent, nextMonthIncome }: { budget: number; allocated: number; spent: number; nextMonthIncome: number }) {
-  const available = budget - allocated;
-  const remaining = budget - spent;
+function MonthlyBudgetCard({
+  budget, budgetIsSet, allocated, spent, nextMonthIncome,
+}: {
+  budget: number; budgetIsSet: boolean; allocated: number; spent: number; nextMonthIncome: number;
+}) {
+  const remainingToAllocate = budget - allocated;
+  const remainingToSpend = budget - spent;
+  const overAllocated = remainingToAllocate < -0.005;
   return (
     <div className="glass-panel rounded-2xl border border-primary/40 p-5">
       <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Current Budget</p>
       <p className="mt-2 font-mono text-2xl font-bold">{fmt(budget)}</p>
+      {!budgetIsSet && (
+        <p className="mt-1 text-[10px] text-warning">
+          Not set — close prior month to establish this month's budget.
+        </p>
+      )}
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <span className={available < 0 ? "text-warning" : "text-muted-foreground"}>Budget Available</span>
-        <span className={`text-right font-mono ${available < 0 ? "text-warning" : ""}`}>{fmt(available)}</span>
-        <span className="text-muted-foreground">Amount Spent</span>
+        <span className="text-muted-foreground">Allocated this month</span>
+        <span className="text-right font-mono">{fmt(allocated)}</span>
+        <span className="text-muted-foreground">Spent this month</span>
         <span className="text-right font-mono">{fmt(spent)}</span>
-        <span className={remaining < 0 ? "text-warning" : "text-muted-foreground"}>Remaining Budget</span>
-        <span className={`text-right font-mono ${remaining < 0 ? "text-warning" : ""}`}>{fmt(remaining)}</span>
+        <span className={overAllocated ? "text-warning" : "text-muted-foreground"}>Remaining to allocate</span>
+        <span className={`text-right font-mono ${overAllocated ? "text-warning" : ""}`}>{fmt(remainingToAllocate)}</span>
+        <span className={remainingToSpend < 0 ? "text-warning" : "text-muted-foreground"}>Remaining to spend</span>
+        <span className={`text-right font-mono ${remainingToSpend < 0 ? "text-warning" : ""}`}>{fmt(remainingToSpend)}</span>
       </div>
+      {overAllocated && (
+        <p className="mt-2 text-[11px] text-warning">
+          ⚠ Monthly plan is overallocated by {fmt(Math.abs(remainingToAllocate))}.
+        </p>
+      )}
       <div className="mt-3 border-t border-white/10 pt-2 text-xs">
         <div className="grid grid-cols-2 gap-x-3">
           <span className="text-muted-foreground">Next Month Income</span>
           <span className="text-right font-mono text-primary">{fmt(nextMonthIncome)}</span>
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Income this month becomes next month's budget after closing.
+          Only spending-category allocations reduce "Remaining to allocate". Cumulative
+          balances stay separate.
         </p>
       </div>
     </div>
   );
 }
 
-function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transaction[]; onEdit: () => void }) {
+
+function BudgetRow({
+  cat, txns, contribution, balance, onEdit,
+}: {
+  cat: BudgetCategory;
+  txns: Transaction[];
+  contribution: number;
+  balance: number;
+  onEdit: () => void;
+}) {
   const spent = budgetSpent(cat, txns);
   const limit = Number(cat.monthly_limit);
-  const roll = Number(cat.rollover_balance);
-  const available = limit + roll;
-  const pct = available > 0 ? Math.min(100, (spent / available) * 100) : 0;
-  const remaining = available - spent;
-  const isSaving = cat.kind !== "spending";
   const goal = cat.goal_amount ? Number(cat.goal_amount) : null;
-  const goalPct = goal && goal > 0 ? Math.min(100, (roll / goal) * 100) : null;
   const label = CATEGORY_LABELS[cat.code] ?? { long: cat.name, short: cat.code };
   const accent = (cat.color && cat.color.startsWith("#")) ? cat.color : (SERIES_COLOR[cat.code] ?? "hsl(var(--primary))");
-  const overspent = pct >= 100 && !isSaving;
+
+  const isSpending = cat.kind === "spending";
+  const isSavings = cat.kind === "savings";
+
+  // Spending: bar tracks spent vs monthly allocation.
+  // Savings/investment: bar tracks actual contribution vs planned contribution (or goal for savings).
+  let barValue = 0;
+  let barMax = 0;
+  let headline = "";
+  if (isSpending) {
+    barValue = spent;
+    barMax = limit;
+    headline = `${fmt(spent)} / ${fmt(limit)}`;
+  } else {
+    barValue = contribution;
+    barMax = limit > 0 ? limit : (goal ?? 0);
+    headline = limit > 0
+      ? `${fmt(contribution)} / ${fmt(limit)} planned`
+      : `${fmt(contribution)} contributed`;
+  }
+  const pct = barMax > 0 ? Math.min(100, (barValue / barMax) * 100) : 0;
+  const overspent = isSpending && limit > 0 && spent > limit;
+  const goalPct = goal && goal > 0 ? Math.min(100, (balance / goal) * 100) : null;
 
   return (
     <button
@@ -511,9 +592,7 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
             {cat.kind}{cat.rollover ? " · rolls over" : ""}
           </p>
         </div>
-        <p className="font-mono text-sm">
-          {isSaving ? `${fmt(spent)} contributed` : `${fmt(spent)} / ${fmt(available)}`}
-        </p>
+        <p className="font-mono text-sm">{headline}</p>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
         <div
@@ -521,11 +600,24 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
           style={{ width: `${pct}%`, backgroundColor: overspent ? "hsl(var(--warning))" : accent }}
         />
       </div>
-      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
-        <span>Budgeted {fmt(limit)}{roll ? ` · carryover ${fmt(roll)}` : ""}</span>
-        <span className={remaining < 0 ? "text-warning" : ""}>Remaining {fmt(remaining)}</span>
-      </div>
-      {goalPct != null && (
+
+      {isSpending ? (
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
+          <span>Monthly allocation {fmt(limit)}</span>
+          <span className={limit - spent < 0 ? "text-warning" : ""}>Remaining {fmt(limit - spent)}</span>
+        </div>
+      ) : (
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>Planned contribution</span>
+          <span className="text-right font-mono">{fmt(limit)}</span>
+          <span>Actual this month</span>
+          <span className="text-right font-mono">{fmt(contribution)}</span>
+          <span>Current balance</span>
+          <span className="text-right font-mono" style={{ color: accent }}>{fmt(balance)}</span>
+        </div>
+      )}
+
+      {isSavings && goalPct != null && (
         <div className="mt-3">
           <div className="mb-1 flex items-baseline justify-between text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1"><Target className="size-3" /> Goal {fmt(goal!)}</span>
@@ -539,6 +631,7 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
     </button>
   );
 }
+
 
 function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction; account?: Account; category?: BudgetCategory; isCredit: boolean; onEdit: () => void }) {
   const del = useDeleteTransaction();
