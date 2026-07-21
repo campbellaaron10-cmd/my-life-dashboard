@@ -284,10 +284,12 @@ function FinancesDashboard() {
         />
         <MonthlyBudgetCard
           budget={monthlyBudget}
-          allocated={totalAllocated}
+          budgetIsSet={budgetIsSet}
+          allocated={spendingAllocated}
           spent={monthlySpent}
           nextMonthIncome={monthlyIncome}
         />
+
       </div>
 
 
