@@ -214,19 +214,19 @@ function Dashboard() {
           }
         >
           <GlassCard className="col-span-12 lg:col-span-8">
-            <div className="mb-6 flex items-start justify-between gap-4">
+            <div className="mb-4 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-semibold">Financial Core</h2>
+                <h2 className="text-xl font-semibold">Financial Core</h2>
                 <Link to="/money" className="text-xs text-primary hover:underline">Open Finances →</Link>
               </div>
               <div className="text-right">
-                <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Net Worth</p>
-                <p className="font-mono text-3xl font-bold">{fmt(finance.netWorth)}</p>
+                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">Net Worth</p>
+                <p className="font-mono text-2xl font-bold">{fmt(finance.netWorth)}</p>
               </div>
             </div>
 
-            {/* Key metrics grid */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {/* Primary: budget & remaining */}
+            <div className="grid grid-cols-2 gap-3">
               <MetricTile
                 label="Current Budget"
                 value={finance.budgetIsSet ? fmt(finance.monthlyBudget) : "—"}
@@ -238,52 +238,27 @@ function Dashboard() {
                 hint={finance.budgetIsSet ? `${fmt(finance.monthlySpent)} spent` : ""}
                 accent={finance.remainingBudget < 0 ? "var(--warning, #f59e0b)" : undefined}
               />
-              <MetricTile
-                label="Vacation Fund"
-                sub="VAC"
-                value={fmt(finance.balanceByCode.VAC)}
-                accent={SERIES_COLOR.VAC}
-              />
-              <MetricTile
-                label="Short-Term Savings"
-                sub="STS"
-                value={fmt(finance.balanceByCode.STS)}
-                accent={SERIES_COLOR.STS}
-              />
-              <MetricTile
-                label="Fidelity"
-                sub="FED"
-                value={fmt(finance.balanceByCode.FED)}
-                accent={SERIES_COLOR.FED}
-              />
-              <MetricTile
-                label="Long-Term Savings"
-                sub="LTS"
-                value={fmt(finance.balanceByCode.LTS)}
-                accent={SERIES_COLOR.LTS}
-              />
-              <MetricTile
-                label="Restricted Stock"
-                sub="RSU"
-                value={fmt(finance.balanceByCode.RSU)}
-                accent={SERIES_COLOR.RSU}
-              />
-              <MetricTile
-                label="Regions Checking"
-                value={fmt(finance.balanceByCode.Regions)}
-                accent={SERIES_COLOR.Regions}
-              />
             </div>
 
-            {/* Compact growth chart */}
-            <Link to="/money" className="mt-6 block rounded-2xl border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
-              <div className="mb-2 flex items-center justify-between">
-                <p className="flex items-center gap-2 text-sm font-medium">
-                  <LineChartIcon className="size-4" /> Investment &amp; Savings Growth
+            {/* Secondary: compact balance chips */}
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <BalanceChip label="Vacation" sub="VAC" value={fmt(finance.balanceByCode.VAC)} color={SERIES_COLOR.VAC} />
+              <BalanceChip label="Short-Term" sub="STS" value={fmt(finance.balanceByCode.STS)} color={SERIES_COLOR.STS} />
+              <BalanceChip label="Fidelity" sub="FED" value={fmt(finance.balanceByCode.FED)} color={SERIES_COLOR.FED} />
+              <BalanceChip label="Long-Term" sub="LTS" value={fmt(finance.balanceByCode.LTS)} color={SERIES_COLOR.LTS} />
+              <BalanceChip label="RSU" sub="RSU" value={fmt(finance.balanceByCode.RSU)} color={SERIES_COLOR.RSU} />
+              <BalanceChip label="Regions" sub="CHK" value={fmt(finance.balanceByCode.Regions)} color={SERIES_COLOR.Regions} />
+            </div>
+
+            {/* Compact embedded chart */}
+            <Link to="/money" className="mt-4 block rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10">
+              <div className="mb-1 flex items-center justify-between">
+                <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                  <LineChartIcon className="size-3" /> Investment & Savings Growth
                 </p>
-                <span className="text-xs text-primary">Open full chart →</span>
+                <span className="text-[10px] text-primary">Open chart →</span>
               </div>
-              <FinanceMiniChart summaries={finance.summaries} />
+              <FinanceMiniChart summaries={finance.summaries} compact />
             </Link>
           </GlassCard>
         </PrivacyGuard>
