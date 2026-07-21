@@ -437,30 +437,46 @@ function FinancesDashboard() {
 }
 
 // --- Building blocks ------------------------------------------------------
-function StatTile({ label, sub, value, hint, onClick }: { label: string; sub?: string; value: string; hint?: string; onClick?: () => void }) {
+function StatTile({ label, sub, value, hint, onClick, accent }: { label: string; sub?: string; value: string; hint?: string; onClick?: () => void; accent?: string }) {
   const Comp: any = onClick ? "button" : "div";
   return (
-    <Comp onClick={onClick} className={`glass-panel rounded-2xl p-5 text-left transition-all ${onClick ? "hover:bg-white/5" : ""}`}>
+    <Comp
+      onClick={onClick}
+      className={`glass-panel relative overflow-hidden rounded-2xl p-5 text-left transition-all ${onClick ? "hover:bg-white/5" : ""}`}
+      style={accent ? { boxShadow: `inset 3px 0 0 ${accent}` } : undefined}
+    >
       <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
         {label}{sub && <span className="ml-1 opacity-70">· {sub}</span>}
       </p>
-      <p className="mt-2 font-mono text-2xl font-bold">{value}</p>
+      <p className="mt-2 font-mono text-2xl font-bold" style={accent ? { color: accent } : undefined}>{value}</p>
       {hint && <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>}
     </Comp>
   );
 }
 
-function MonthlyBudgetCard({ budget, income, allocated, spent, unallocated }: { budget: number; income: number; allocated: number; spent: number; unallocated: number }) {
+function MonthlyBudgetCard({ budget, allocated, spent, nextMonthIncome }: { budget: number; allocated: number; spent: number; nextMonthIncome: number }) {
+  const available = budget - allocated;
+  const remaining = budget - spent;
   return (
     <div className="glass-panel rounded-2xl border border-primary/40 p-5">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Monthly Budget</p>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Current Budget</p>
       <p className="mt-2 font-mono text-2xl font-bold">{fmt(budget)}</p>
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <span className="text-muted-foreground">Income</span><span className="text-right font-mono">{fmt(income)}</span>
-        <span className="text-muted-foreground">Allocated</span><span className="text-right font-mono">{fmt(allocated)}</span>
-        <span className="text-muted-foreground">Spent</span><span className="text-right font-mono">{fmt(spent)}</span>
-        <span className={unallocated < 0 ? "text-warning" : "text-muted-foreground"}>Unallocated</span>
-        <span className={`text-right font-mono ${unallocated < 0 ? "text-warning" : ""}`}>{fmt(unallocated)}</span>
+        <span className={available < 0 ? "text-warning" : "text-muted-foreground"}>Budget Available</span>
+        <span className={`text-right font-mono ${available < 0 ? "text-warning" : ""}`}>{fmt(available)}</span>
+        <span className="text-muted-foreground">Amount Spent</span>
+        <span className="text-right font-mono">{fmt(spent)}</span>
+        <span className={remaining < 0 ? "text-warning" : "text-muted-foreground"}>Remaining Budget</span>
+        <span className={`text-right font-mono ${remaining < 0 ? "text-warning" : ""}`}>{fmt(remaining)}</span>
+      </div>
+      <div className="mt-3 border-t border-white/10 pt-2 text-xs">
+        <div className="grid grid-cols-2 gap-x-3">
+          <span className="text-muted-foreground">Next Month Income</span>
+          <span className="text-right font-mono text-primary">{fmt(nextMonthIncome)}</span>
+        </div>
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Income this month becomes next month's budget after closing.
+        </p>
       </div>
     </div>
   );
