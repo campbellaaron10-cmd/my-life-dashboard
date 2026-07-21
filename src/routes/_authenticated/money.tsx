@@ -117,12 +117,13 @@ function FinancesDashboard() {
   const snapshots = useBalanceSnapshots();
   const summaries = useMonthlySummaries();
   const seed = useSeedFinanceDefaults();
-  const rollover = useApplyFunRollover();
 
   const [txnDialog, setTxnDialog] = useState<Partial<Transaction> | null>(null);
   const [budgetDialog, setBudgetDialog] = useState<Partial<BudgetCategory> | null>(null);
   const [accountDialog, setAccountDialog] = useState<Partial<Account> | null>(null);
   const [monthDialog, setMonthDialog] = useState<Partial<MonthlySummary> | null>(null);
+  const [monthReport, setMonthReport] = useState<MonthlySummary | null>(null);
+  const [closeMonthOpen, setCloseMonthOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
