@@ -299,7 +299,7 @@ function FinancesDashboard() {
           <div>
             <h2 className="text-xl font-semibold">This month</h2>
             <p className="text-sm text-muted-foreground">
-              Budget {fmt(monthlyBudget)} · Allocated {fmt(totalAllocated)} · Spent {fmt(monthlySpent)} · Unallocated {fmt(unallocated)}
+              Budget {fmt(monthlyBudget)} · Allocated {fmt(spendingAllocated)} · Spent {fmt(monthlySpent)} · Remaining to allocate {fmt(remainingToAllocate)}
             </p>
           </div>
           <div className="flex gap-2">
