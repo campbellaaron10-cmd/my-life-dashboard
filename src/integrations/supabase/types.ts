@@ -353,6 +353,8 @@ export type Database = {
           month: string
           notes: string | null
           regions_balance: number
+          rsu_balance: number
+          rsu_contribution: number
           source: string
           sts_allocated: number
           sts_balance: number
@@ -378,6 +380,8 @@ export type Database = {
           month: string
           notes?: string | null
           regions_balance?: number
+          rsu_balance?: number
+          rsu_contribution?: number
           source?: string
           sts_allocated?: number
           sts_balance?: number
@@ -403,6 +407,8 @@ export type Database = {
           month?: string
           notes?: string | null
           regions_balance?: number
+          rsu_balance?: number
+          rsu_contribution?: number
           source?: string
           sts_allocated?: number
           sts_balance?: number
