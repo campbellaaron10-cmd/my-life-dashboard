@@ -152,12 +152,6 @@ function FinancesDashboard() {
       .reduce((s, t) => s + Number(t.amount), 0),
     [allTxns, monthStart, nextMonthStart],
   );
-  const monthlySpent = useMemo(
-    () => allTxns
-      .filter((t) => t.type === "expense" && new Date(t.occurred_on) >= monthStart && new Date(t.occurred_on) < nextMonthStart)
-      .reduce((s, t) => s + Number(t.amount), 0),
-    [allTxns, monthStart, nextMonthStart],
-  );
 
   // Current-month budget comes from the stored monthly summary created when
   // the prior month was closed. Do NOT invent one from prior income/housing —
@@ -166,6 +160,28 @@ function FinancesDashboard() {
   const currentSummary = allSummaries.find((s) => s.month === curMonthKey);
   const monthlyBudget = currentSummary ? Number(currentSummary.budget) : 0;
   const budgetIsSet = !!currentSummary;
+
+  // Spending per spending-category — sourced from the imported monthly
+  // summary when present, falling back to live transactions.
+  const summarySpentByCode: Record<string, number> = {
+    HOU: Number(currentSummary?.housing ?? 0),
+    ESS: Number(currentSummary?.ess_spent ?? 0),
+    FUN: Number(currentSummary?.fun_spent ?? 0),
+  };
+  // Savings / investment "actual contribution this month" from the summary.
+  const summaryContribByCode: Record<string, number> = {
+    STS: Number(currentSummary?.sts_spent ?? 0),
+    LTS: Number(currentSummary?.lts_contribution ?? 0),
+    FED: Number(currentSummary?.fed_earnings ?? 0),
+    RSU: Number(currentSummary?.rsu_contribution ?? 0),
+  };
+  // Planned allocation overrides from the summary (per workbook plan).
+  const summaryAllocByCode: Record<string, number> = {
+    HOU: Number(currentSummary?.housing ?? 0),
+    ESS: Number(currentSummary?.ess_allocated ?? 0),
+    FUN: Number(currentSummary?.fun_allocated ?? 0),
+    STS: Number(currentSummary?.sts_allocated ?? 0),
+  };
 
   // Contribution this month, per category: sum of savings_contribution /
   // investment_contribution transactions tagged to that category.
@@ -192,12 +208,20 @@ function FinancesDashboard() {
     RSU: Number((latestSummary as any)?.rsu_balance ?? 0),
   };
 
-  // "Allocated this month" only counts spending categories. Cumulative
-  // balances on savings/investment categories must not inflate this number.
-  const spendingAllocated = allBudgets
-    .filter((b) => b.kind === "spending")
-    .reduce((s, b) => s + Number(b.monthly_limit), 0);
-  const remainingToAllocate = monthlyBudget - spendingAllocated;
+  // Total spent this month — prefer imported summary sums, else live txns.
+  const summarySpendTotal =
+    summarySpentByCode.HOU + summarySpentByCode.ESS + summarySpentByCode.FUN;
+  const liveMonthlySpent = useMemo(
+    () => allTxns
+      .filter((t) => t.type === "expense" && new Date(t.occurred_on) >= monthStart && new Date(t.occurred_on) < nextMonthStart)
+      .reduce((s, t) => s + Number(t.amount), 0),
+    [allTxns, monthStart, nextMonthStart],
+  );
+  const monthlySpent = summarySpendTotal > 0 ? summarySpendTotal : liveMonthlySpent;
+
+  const priorMonthLabel = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    .toLocaleString("en-US", { month: "long" });
+
 
 
   const findAcc = (nameFragment: string) =>
