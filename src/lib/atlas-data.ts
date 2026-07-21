@@ -102,7 +102,7 @@ export function useTransactions(limit?: number) {
 export function useUpsertTransaction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: Partial<Transaction> & { merchant: string; amount: number; account_id: string }) => {
+    mutationFn: async (input: Partial<Transaction> & { merchant: string; amount: number }) => {
       const user_id = await currentUserId();
       const { data, error } = await supabase.from("transactions").upsert({ ...input, user_id }).select().single();
       if (error) throw error;
