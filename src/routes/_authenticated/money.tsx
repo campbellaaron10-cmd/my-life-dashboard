@@ -309,9 +309,9 @@ function FinancesDashboard() {
         <MonthlyBudgetCard
           budget={monthlyBudget}
           budgetIsSet={budgetIsSet}
-          allocated={spendingAllocated}
           spent={monthlySpent}
           nextMonthIncome={monthlyIncome}
+          priorMonthLabel={priorMonthLabel}
         />
 
       </div>
@@ -323,9 +323,10 @@ function FinancesDashboard() {
           <div>
             <h2 className="text-xl font-semibold">This month</h2>
             <p className="text-sm text-muted-foreground">
-              Budget {fmt(monthlyBudget)} · Allocated {fmt(spendingAllocated)} · Spent {fmt(monthlySpent)} · Remaining to allocate {fmt(remainingToAllocate)}
+              Starting budget {fmt(monthlyBudget)} · Spent {fmt(monthlySpent)} · Remaining {fmt(monthlyBudget - monthlySpent)}
             </p>
           </div>
+
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => setCloseMonthOpen(true)}>
               <RefreshCw className="mr-1 size-4" /> Close prior month
