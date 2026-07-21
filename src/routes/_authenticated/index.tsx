@@ -2,13 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning,
-  AlertTriangle, Plane, ChefHat, ArrowUpRight, Wallet, CheckSquare, Refrigerator, ShoppingBag,
+  AlertTriangle, ArrowUpRight, Wallet, CheckSquare, Refrigerator, ShoppingBag,
+  LineChart as LineChartIcon, Sparkles,
 } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
+import { FinanceMiniChart } from "@/components/atlas/FinanceMiniChart";
 import {
-  useAccounts, useTransactions, useBudgets, usePantry, useTasks,
-  accountBalance, budgetSpent, daysUntil,
+  usePantry, useTasks, daysUntil,
 } from "@/lib/atlas-data";
+import { useFinanceSummary, SERIES_COLOR, CATEGORY_LABELS } from "@/lib/finance-summary";
 import { useSavedLocation, useWeather, weatherCondition } from "@/hooks/useWeather";
 import { PrivacyGuard, usePrivacyMode } from "@/context/PrivacyMode";
 
@@ -16,18 +18,26 @@ export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Dashboard — Atlas" },
-      { name: "description", content: "Your daily command center: finances, tasks, pantry, and more." },
+      { name: "description", content: "What needs your attention today — finances, food, tasks, and weather at a glance." },
     ],
   }),
   component: Dashboard,
 });
 
-function greeting() {
+// --- Greetings -----------------------------------------------------------
+const GREETINGS = {
+  morning: ["Good morning.", "Morning, Aaron.", "Welcome back.", "Systems online."],
+  afternoon: ["Good afternoon.", "Welcome back, Aaron.", "Good to see you."],
+  evening: ["Good evening.", "Evening, Aaron.", "Welcome home.", "Good to see you again."],
+};
+
+function pickGreeting() {
   const h = new Date().getHours();
-  if (h < 5) return "Good evening";
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
+  const bucket = h < 5 ? "evening" : h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
+  const pool = GREETINGS[bucket];
+  // Stable-per-hour randomness so the greeting doesn't reshuffle every render.
+  const seed = Math.floor(Date.now() / (1000 * 60 * 60));
+  return pool[seed % pool.length];
 }
 
 const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -43,48 +53,107 @@ function weatherIcon(code: number, cls = "size-8") {
 }
 
 function Dashboard() {
-  const accounts = useAccounts();
-  const txns = useTransactions(20);
-  const budgets = useBudgets();
   const pantry = usePantry();
   const tasks = useTasks();
   const { location } = useSavedLocation();
   const weather = useWeather(location);
   const { mode } = usePrivacyMode();
+  const finance = useFinanceSummary();
 
-  const netWorth = useMemo(
-    () => (accounts.data ?? []).reduce((s, a) => s + accountBalance(a, txns.data ?? []), 0),
-    [accounts.data, txns.data],
+  // ---- Derived (kept small; only what the widgets need) ----
+  const expiring = useMemo(() =>
+    (pantry.data ?? [])
+      .map((p) => ({ item: p, days: daysUntil(p.expires_on) }))
+      .filter((x) => x.days !== null && x.days <= 5)
+      .sort((a, b) => (a.days ?? 99) - (b.days ?? 99)),
+    [pantry.data],
   );
-
-  const expiring = (pantry.data ?? [])
-    .map((p) => ({ item: p, days: daysUntil(p.expires_on) }))
-    .filter((x) => x.days !== null && x.days <= 5)
-    .slice(0, 4);
 
   const openTasks = (tasks.data ?? []).filter((t) => !t.is_done);
   const todayTasks = openTasks.filter((t) => t.kind !== "shopping").slice(0, 5);
   const shopping = openTasks.filter((t) => t.kind === "shopping");
 
-  const briefingItems = useMemo(() => {
-    const out: string[] = [];
-    if (expiring.some((e) => (e.days ?? 0) <= 1)) out.push(`${expiring.filter((e) => (e.days ?? 0) <= 1).length} pantry item(s) expiring today.`);
-    const highPri = openTasks.filter((t) => t.priority === "high").length;
-    if (highPri) out.push(`${highPri} high-priority task${highPri > 1 ? "s" : ""} open.`);
-    if (shopping.length) out.push(`${shopping.length} shopping item${shopping.length > 1 ? "s" : ""} on the list.`);
-    const overBudget = (budgets.data ?? []).filter((b) => budgetSpent(b, txns.data ?? []) >= Number(b.monthly_limit) && Number(b.monthly_limit) > 0).length;
-    if (overBudget && mode === "private") out.push(`${overBudget} budget${overBudget > 1 ? "s" : ""} over limit.`);
-    if (weather.data?.daily[0]?.precipProb && weather.data.daily[0].precipProb >= 60) out.push(`Rain likely today (${weather.data.daily[0].precipProb}%).`);
-    if (!out.length) out.push("All systems nominal. No urgent signals.");
-    return out;
-  }, [expiring, openTasks, shopping, budgets.data, txns.data, weather.data, mode]);
+  // ---- Atlas Briefing: dynamic, high-signal only ----
+  const briefing = useMemo(() => {
+    const items: { text: string; tone?: "warn" | "info" | "good" }[] = [];
+    const now = new Date();
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const monthProgress = dayOfMonth / daysInMonth;
+
+    if (mode === "private") {
+      // Spending pace: only flag when spent% outpaces month progress by >20pts
+      // AND we're past day 3 (avoid noise early in the month).
+      if (dayOfMonth > 3 && finance.monthlyBudget > 0) {
+        for (const code of ["HOU", "ESS", "FUN"] as const) {
+          const spent = finance.spentByCode[code] ?? 0;
+          const alloc = finance.allocByCode[code] ?? 0;
+          if (alloc <= 0) continue;
+          const spentPct = spent / alloc;
+          if (spentPct >= 0.95) {
+            items.push({ text: `${CATEGORY_LABELS[code].long} nearly spent — ${Math.round(spentPct * 100)}% of allocation.`, tone: "warn" });
+          } else if (spentPct - monthProgress > 0.2) {
+            items.push({ text: `${CATEGORY_LABELS[code].long} pace is high — ${Math.round(spentPct * 100)}% spent, ${Math.round(monthProgress * 100)}% through the month.`, tone: "warn" });
+          }
+        }
+      }
+      // Savings milestone: check if VAC/STS crossed a $500 threshold vs prior month.
+      const prior = finance.summaries.at(-2);
+      const latest = finance.summaries.at(-1);
+      if (prior && latest) {
+        for (const [code, key] of [
+          ["VAC", "vac_balance"], ["STS", "sts_balance"], ["LTS", "lts_balance"], ["FED", "fed_balance"],
+        ] as const) {
+          const p = Math.floor(Number((prior as any)[key] ?? 0) / 500);
+          const l = Math.floor(Number((latest as any)[key] ?? 0) / 500);
+          if (l > p) {
+            items.push({ text: `${CATEGORY_LABELS[code].long} passed ${fmt(l * 500)}.`, tone: "good" });
+          }
+        }
+      }
+    }
+
+    // Pantry: only 0–2 day windows
+    const urgent = expiring.filter((e) => (e.days ?? 99) <= 2);
+    if (urgent.length) {
+      const first = urgent[0];
+      const others = urgent.length - 1;
+      const when = first.days! < 0 ? `expired ${Math.abs(first.days!)}d ago` : first.days === 0 ? "expires today" : `expires in ${first.days}d`;
+      items.push({
+        text: others > 0
+          ? `${first.item.name} ${when} · ${others} other item${others > 1 ? "s" : ""} also expiring soon.`
+          : `${first.item.name} ${when}.`,
+        tone: "warn",
+      });
+    }
+
+    // Tasks: due today (not shopping)
+    const dueToday = openTasks.filter((t) => t.kind !== "shopping" && daysUntil(t.due_on) === 0);
+    const overdue = openTasks.filter((t) => t.kind !== "shopping" && (daysUntil(t.due_on) ?? 99) < 0);
+    if (overdue.length) items.push({ text: `${overdue.length} task${overdue.length > 1 ? "s" : ""} overdue.`, tone: "warn" });
+    else if (dueToday.length) items.push({ text: `${dueToday.length} task${dueToday.length > 1 ? "s" : ""} due today.`, tone: "info" });
+
+    // Weather: rain likely, unusual temps
+    const today = weather.data?.daily[0];
+    if (today) {
+      if ((today.precipProb ?? 0) >= 60) {
+        items.push({ text: `Rain likely today (${today.precipProb}%). Consider indoor plans.`, tone: "info" });
+      } else if (today.tempMax >= 95) {
+        items.push({ text: `Hot day ahead — high ${Math.round(today.tempMax)}°.`, tone: "info" });
+      } else if (today.tempMin <= 32) {
+        items.push({ text: `Freezing overnight — low ${Math.round(today.tempMin)}°.`, tone: "info" });
+      }
+    }
+
+    return items;
+  }, [finance, expiring, openTasks, weather.data, mode]);
 
   return (
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Systems Nominal</p>
-          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">{greeting()}.</h1>
+          <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Command Center</p>
+          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">{pickGreeting()}</h1>
         </div>
         <Link to="/weather" className="text-right transition-opacity hover:opacity-80">
           <p className="flex items-center justify-end gap-2 text-4xl font-light tracking-tight">
@@ -99,18 +168,32 @@ function Dashboard() {
         </Link>
       </header>
 
+      {/* Atlas Briefing */}
       <GlassCard className="border border-primary/20 bg-gradient-to-br from-primary/10 to-transparent">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex items-start gap-3">
+          <Sparkles className="mt-1 size-4 shrink-0 text-primary" />
+          <div className="min-w-0 flex-1">
             <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Atlas Briefing</p>
-            <ul className="space-y-1.5 text-lg">
-              {briefingItems.map((b, i) => <li key={i}>· {b}</li>)}
-            </ul>
+            {briefing.length === 0 ? (
+              <p className="text-lg text-muted-foreground">All systems nominal.</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {briefing.map((b, i) => (
+                  <li key={i} className="flex items-start gap-2 text-lg">
+                    <span className={`mt-2 size-1.5 shrink-0 rounded-full ${
+                      b.tone === "warn" ? "bg-warning" : b.tone === "good" ? "bg-success" : "bg-primary"
+                    }`} />
+                    <span>{b.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       </GlassCard>
 
       <div className="grid grid-cols-12 gap-6">
+        {/* Financial Core — summary only, mirrors Finances module */}
         <PrivacyGuard
           sensitivity="private-only"
           fallback={
@@ -123,54 +206,81 @@ function Dashboard() {
           }
         >
           <GlassCard className="col-span-12 lg:col-span-8">
-            <div className="mb-8 flex items-start justify-between">
+            <div className="mb-6 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-2xl font-semibold">Financial Core</h2>
-                <Link to="/money" className="text-xs text-primary hover:underline">Open Money →</Link>
+                <Link to="/money" className="text-xs text-primary hover:underline">Open Finances →</Link>
               </div>
               <div className="text-right">
                 <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Net Worth</p>
-                <p className="font-mono text-3xl font-bold">{fmt(netWorth)}</p>
+                <p className="font-mono text-3xl font-bold">{fmt(finance.netWorth)}</p>
               </div>
             </div>
-            {(accounts.data ?? []).length === 0 ? (
-              <EmptyLink to="/money" text="Add your first account to see balances." />
-            ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                {accounts.data!.slice(0, 3).map((a) => (
-                  <div key={a.id} className="rounded-2xl bg-white/5 p-5">
-                    <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{a.name}</p>
-                    <p className="mt-2 font-mono text-2xl font-bold tracking-tight">{fmt(accountBalance(a, txns.data ?? []))}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{a.institution ?? a.type}</p>
-                  </div>
-                ))}
+
+            {/* Key metrics grid */}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <MetricTile
+                label="Current Budget"
+                value={finance.budgetIsSet ? fmt(finance.monthlyBudget) : "—"}
+                hint={finance.budgetIsSet ? `Based on ${finance.priorMonthLabel} income` : "Close prior month"}
+              />
+              <MetricTile
+                label="Remaining"
+                value={finance.budgetIsSet ? fmt(finance.remainingBudget) : "—"}
+                hint={finance.budgetIsSet ? `${fmt(finance.monthlySpent)} spent` : ""}
+                accent={finance.remainingBudget < 0 ? "var(--warning, #f59e0b)" : undefined}
+              />
+              <MetricTile
+                label="Vacation Fund"
+                sub="VAC"
+                value={fmt(finance.balanceByCode.VAC)}
+                accent={SERIES_COLOR.VAC}
+              />
+              <MetricTile
+                label="Short-Term Savings"
+                sub="STS"
+                value={fmt(finance.balanceByCode.STS)}
+                accent={SERIES_COLOR.STS}
+              />
+              <MetricTile
+                label="Fidelity"
+                sub="FED"
+                value={fmt(finance.balanceByCode.FED)}
+                accent={SERIES_COLOR.FED}
+              />
+              <MetricTile
+                label="Long-Term Savings"
+                sub="LTS"
+                value={fmt(finance.balanceByCode.LTS)}
+                accent={SERIES_COLOR.LTS}
+              />
+              <MetricTile
+                label="Restricted Stock"
+                sub="RSU"
+                value={fmt(finance.balanceByCode.RSU)}
+                accent={SERIES_COLOR.RSU}
+              />
+              <MetricTile
+                label="Regions Checking"
+                value={fmt(finance.balanceByCode.Regions)}
+                accent={SERIES_COLOR.Regions}
+              />
+            </div>
+
+            {/* Compact growth chart */}
+            <Link to="/money" className="mt-6 block rounded-2xl border border-white/5 bg-white/5 p-4 transition-colors hover:bg-white/10">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="flex items-center gap-2 text-sm font-medium">
+                  <LineChartIcon className="size-4" /> Investment &amp; Savings Growth
+                </p>
+                <span className="text-xs text-primary">Open full chart →</span>
               </div>
-            )}
-            {(budgets.data ?? []).length > 0 && (
-              <div className="mt-8 border-t border-white/5 pt-6">
-                <h3 className="mb-4 text-sm font-medium text-muted-foreground">Budget Progress</h3>
-                <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
-                  {budgets.data!.slice(0, 6).map((c) => {
-                    const spent = budgetSpent(c, txns.data ?? []);
-                    const pct = Number(c.monthly_limit) > 0 ? Math.min(100, (spent / Number(c.monthly_limit)) * 100) : 0;
-                    return (
-                      <div key={c.id}>
-                        <div className="mb-1.5 flex items-baseline justify-between text-sm">
-                          <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{c.code} · {c.name}</span>
-                          <span className="font-mono text-xs">{fmt(spent)} / {fmt(Number(c.monthly_limit))}</span>
-                        </div>
-                        <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
-                          <div className={`h-full transition-all ${pct >= 100 ? "bg-warning" : "bg-primary"}`} style={{ width: `${pct}%` }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+              <FinanceMiniChart summaries={finance.summaries} />
+            </Link>
           </GlassCard>
         </PrivacyGuard>
 
+        {/* Weather */}
         <Link to="/weather" className="col-span-12 lg:col-span-4">
           <GlassCard className="h-full transition-all hover:scale-[1.01]">
             <p className="mb-4 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Forecast</p>
@@ -199,9 +309,10 @@ function Dashboard() {
           </GlassCard>
         </Link>
 
+        {/* Tasks */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-4">
           <div className="mb-6 flex items-center justify-between border-b border-white/5 pb-4">
-            <h2 className="text-xl font-semibold">Daily Protocols</h2>
+            <h2 className="text-xl font-semibold">Today's Focus</h2>
             <Link to="/tasks" className="text-xs text-primary hover:underline">All →</Link>
           </div>
           {todayTasks.length === 0 ? (
@@ -230,6 +341,7 @@ function Dashboard() {
           )}
         </GlassCard>
 
+        {/* Pantry */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-5">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-semibold">Pantry Intelligence</h2>
@@ -239,7 +351,7 @@ function Dashboard() {
             <EmptyLink to="/pantry" icon={Refrigerator} text="Nothing expiring soon." />
           ) : (
             <div className="grid gap-3">
-              {expiring.map(({ item, days }) => {
+              {expiring.slice(0, 4).map(({ item, days }) => {
                 const urgent = (days ?? 99) <= 1;
                 return (
                   <div key={item.id} className={`flex items-center justify-between rounded-2xl border p-4 ${urgent ? "border-warning/30 bg-warning/10" : "border-white/5 bg-white/5"}`}>
@@ -257,6 +369,7 @@ function Dashboard() {
           )}
         </GlassCard>
 
+        {/* Shopping */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-3">
           <div className="mb-6 flex items-center justify-between">
             <h2 className="text-xl font-semibold">Shopping</h2>
@@ -279,40 +392,25 @@ function Dashboard() {
             </ul>
           )}
         </GlassCard>
-
-        <PrivacyGuard sensitivity="private-only" fallback={null}>
-          <GlassCard className="col-span-12">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Atlas Feed</h2>
-              <Link to="/money" className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-                View All <ArrowUpRight className="size-4" />
-              </Link>
-            </div>
-            {(txns.data ?? []).length === 0 ? (
-              <EmptyLink to="/money" text="No activity yet." />
-            ) : (
-              <div className="space-y-1">
-                {(txns.data ?? []).slice(0, 8).map((t) => {
-                  const acc = accounts.data?.find((a) => a.id === t.account_id);
-                  const cat = budgets.data?.find((b) => b.id === t.category_id);
-                  return (
-                    <div key={t.id} className="grid grid-cols-[80px_1fr_1fr_120px] items-center gap-4 rounded-xl px-4 py-3 transition-all hover:bg-white/5">
-                      <span className="font-mono text-xs uppercase text-muted-foreground">
-                        {new Date(t.occurred_on).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                      </span>
-                      <span className="font-medium">{t.merchant}</span>
-                      <span className="text-sm text-muted-foreground">{cat?.code ?? "—"} · {acc?.name ?? "—"}</span>
-                      <span className={`text-right font-mono ${t.type === "income" ? "text-success" : "text-foreground"}`}>
-                        {t.type === "income" ? "+" : "-"}{fmtCents(Math.abs(Number(t.amount)))}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </GlassCard>
-        </PrivacyGuard>
       </div>
+      {/* preserve unused fmtCents import for future ledger widgets */}
+      <span className="hidden">{fmtCents(0)}</span>
+    </div>
+  );
+}
+
+function MetricTile({
+  label, sub, value, hint, accent,
+}: { label: string; sub?: string; value: string; hint?: string; accent?: string }) {
+  return (
+    <div className="rounded-2xl border border-white/5 bg-white/5 p-4">
+      <div className="flex items-center gap-2">
+        {accent && <span className="size-2 rounded-full" style={{ background: accent }} />}
+        <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      </div>
+      {sub && <p className="mt-0.5 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">{sub}</p>}
+      <p className="mt-2 font-mono text-xl font-bold tracking-tight">{value}</p>
+      {hint && <p className="mt-1 text-[11px] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -325,5 +423,3 @@ function EmptyLink({ to, icon: Icon, text }: { to: string; icon?: typeof Wallet;
     </Link>
   );
 }
-
-void Plane; void ChefHat;
