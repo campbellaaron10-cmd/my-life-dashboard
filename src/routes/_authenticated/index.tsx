@@ -35,9 +35,22 @@ function pickGreeting() {
   const h = new Date().getHours();
   const bucket = h < 5 ? "evening" : h < 12 ? "morning" : h < 18 ? "afternoon" : "evening";
   const pool = GREETINGS[bucket];
-  // Stable-per-hour randomness so the greeting doesn't reshuffle every render.
   const seed = Math.floor(Date.now() / (1000 * 60 * 60));
   return pool[seed % pool.length];
+}
+
+// --- Rotating header status ---------------------------------------------
+const STATUS_MESSAGES = [
+  "ATLAS ONLINE", "ATLAS AWAKE", "SYSTEM READY", "STANDING BY", "READY",
+  "OPERATIONAL", "CONNECTION ESTABLISHED", "READY FOR TODAY",
+  "Welcome back.", "Good to see you again.", "Ready when you are.", "Let's get organized.",
+  "Awaiting Instructions", "Monitoring Active", "Command Link Established",
+  "Atlas has been expecting you.", "Welcome home.", "Another successful boot.",
+  "Everything's where you left it.", "Your life, organized.", "One dashboard. Everything else.",
+];
+
+function pickStatus() {
+  return STATUS_MESSAGES[Math.floor(Math.random() * STATUS_MESSAGES.length)];
 }
 
 const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
