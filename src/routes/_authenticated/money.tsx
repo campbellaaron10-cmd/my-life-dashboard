@@ -273,12 +273,7 @@ function FinancesDashboard() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => { if (confirm("Close previous month and apply Fun-money rollover?")) rollover.mutate(); }}
-              disabled={rollover.isPending}
-            >
+            <Button size="sm" variant="outline" onClick={() => setCloseMonthOpen(true)}>
               <RefreshCw className="mr-1 size-4" /> Close prior month
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setBudgetDialog({ kind: "spending", rollover: true })}>
