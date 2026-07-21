@@ -484,33 +484,52 @@ function StatTile({ label, sub, value, hint, onClick, accent }: { label: string;
   );
 }
 
-function MonthlyBudgetCard({ budget, allocated, spent, nextMonthIncome }: { budget: number; allocated: number; spent: number; nextMonthIncome: number }) {
-  const available = budget - allocated;
-  const remaining = budget - spent;
+function MonthlyBudgetCard({
+  budget, budgetIsSet, allocated, spent, nextMonthIncome,
+}: {
+  budget: number; budgetIsSet: boolean; allocated: number; spent: number; nextMonthIncome: number;
+}) {
+  const remainingToAllocate = budget - allocated;
+  const remainingToSpend = budget - spent;
+  const overAllocated = remainingToAllocate < -0.005;
   return (
     <div className="glass-panel rounded-2xl border border-primary/40 p-5">
       <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Current Budget</p>
       <p className="mt-2 font-mono text-2xl font-bold">{fmt(budget)}</p>
+      {!budgetIsSet && (
+        <p className="mt-1 text-[10px] text-warning">
+          Not set — close prior month to establish this month's budget.
+        </p>
+      )}
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <span className={available < 0 ? "text-warning" : "text-muted-foreground"}>Budget Available</span>
-        <span className={`text-right font-mono ${available < 0 ? "text-warning" : ""}`}>{fmt(available)}</span>
-        <span className="text-muted-foreground">Amount Spent</span>
+        <span className="text-muted-foreground">Allocated this month</span>
+        <span className="text-right font-mono">{fmt(allocated)}</span>
+        <span className="text-muted-foreground">Spent this month</span>
         <span className="text-right font-mono">{fmt(spent)}</span>
-        <span className={remaining < 0 ? "text-warning" : "text-muted-foreground"}>Remaining Budget</span>
-        <span className={`text-right font-mono ${remaining < 0 ? "text-warning" : ""}`}>{fmt(remaining)}</span>
+        <span className={overAllocated ? "text-warning" : "text-muted-foreground"}>Remaining to allocate</span>
+        <span className={`text-right font-mono ${overAllocated ? "text-warning" : ""}`}>{fmt(remainingToAllocate)}</span>
+        <span className={remainingToSpend < 0 ? "text-warning" : "text-muted-foreground"}>Remaining to spend</span>
+        <span className={`text-right font-mono ${remainingToSpend < 0 ? "text-warning" : ""}`}>{fmt(remainingToSpend)}</span>
       </div>
+      {overAllocated && (
+        <p className="mt-2 text-[11px] text-warning">
+          ⚠ Monthly plan is overallocated by {fmt(Math.abs(remainingToAllocate))}.
+        </p>
+      )}
       <div className="mt-3 border-t border-white/10 pt-2 text-xs">
         <div className="grid grid-cols-2 gap-x-3">
           <span className="text-muted-foreground">Next Month Income</span>
           <span className="text-right font-mono text-primary">{fmt(nextMonthIncome)}</span>
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Income this month becomes next month's budget after closing.
+          Only spending-category allocations reduce "Remaining to allocate". Cumulative
+          balances stay separate.
         </p>
       </div>
     </div>
   );
 }
+
 
 function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transaction[]; onEdit: () => void }) {
   const spent = budgetSpent(cat, txns);
