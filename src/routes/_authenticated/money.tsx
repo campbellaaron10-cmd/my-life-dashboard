@@ -60,6 +60,7 @@ const CATEGORY_LABELS: Record<string, { long: string; short: string }> = {
   VAC: { long: "Vacation Fund", short: "VAC" },
   LTS: { long: "Long-Term Savings (401(k))", short: "LTS" },
   FED: { long: "Fidelity Investments", short: "FED" },
+  RSU: { long: "Restricted Stock Units", short: "RSU" },
 };
 
 const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -77,14 +78,17 @@ const CHART = {
   tooltipBg: "rgba(15, 20, 34, 0.95)",
   tooltipBorder: "rgba(255, 255, 255, 0.18)",
 };
+// Accent color per category. Kept muted enough to sit on the dark glass panels.
+// (FED/STS colors swapped per user request; RSU added.)
 const SERIES_COLOR: Record<string, string> = {
   HOU: "#f59e0b",
   ESS: "#38bdf8",
   FUN: "#a78bfa",
-  STS: "#34d399",
+  STS: "#22d3ee",  // was FED cyan
   VAC: "#f472b6",
   LTS: "#fbbf24",
-  FED: "#22d3ee",
+  FED: "#34d399",  // was STS green
+  RSU: "#c084fc",
   Regions: "#94a3b8",
 };
 
