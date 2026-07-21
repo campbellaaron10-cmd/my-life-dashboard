@@ -363,7 +363,11 @@ function FinancesDashboard() {
               </thead>
               <tbody>
                 {allSummaries.map((s) => (
-                  <tr key={s.id} className="border-t border-white/5 hover:bg-white/5">
+                  <tr
+                    key={s.id}
+                    className="cursor-pointer border-t border-white/5 hover:bg-white/5"
+                    onClick={() => setMonthReport(s)}
+                  >
                     <td className="p-2 font-mono">{monthLabel(s.month)}</td>
                     <td className="p-2 text-right font-mono">{fmt(Number(s.income))}</td>
                     <td className="p-2 text-right font-mono">{fmt(Number(s.housing))}</td>
@@ -375,7 +379,10 @@ function FinancesDashboard() {
                     <td className="p-2 text-right font-mono">{fmt(Number(s.lts_balance))}</td>
                     <td className="p-2 text-right font-mono">{fmt(Number(s.fed_balance))}</td>
                     <td className="p-2 text-right">
-                      <button className="text-muted-foreground hover:text-primary" onClick={() => setMonthDialog(s)}>
+                      <button
+                        className="text-muted-foreground hover:text-primary"
+                        onClick={(e) => { e.stopPropagation(); setMonthDialog(s); }}
+                      >
                         <Pencil className="size-3.5" />
                       </button>
                     </td>
