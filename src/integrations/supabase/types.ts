@@ -204,6 +204,7 @@ export type Database = {
           fun_to_sts_pct: number
           fun_to_vacation_pct: number
           last_month_closed: string | null
+          rules: Json
           updated_at: string
           user_id: string
         }
@@ -213,6 +214,7 @@ export type Database = {
           fun_to_sts_pct?: number
           fun_to_vacation_pct?: number
           last_month_closed?: string | null
+          rules?: Json
           updated_at?: string
           user_id: string
         }
@@ -222,6 +224,7 @@ export type Database = {
           fun_to_sts_pct?: number
           fun_to_vacation_pct?: number
           last_month_closed?: string | null
+          rules?: Json
           updated_at?: string
           user_id?: string
         }
@@ -332,6 +335,84 @@ export type Database = {
         }
         Relationships: []
       }
+      monthly_summaries: {
+        Row: {
+          budget: number
+          created_at: string
+          ess_allocated: number
+          ess_spent: number
+          fed_balance: number
+          fed_earnings: number
+          fun_allocated: number
+          fun_spent: number
+          housing: number
+          id: string
+          income: number
+          lts_balance: number
+          lts_contribution: number
+          month: string
+          notes: string | null
+          regions_balance: number
+          source: string
+          sts_allocated: number
+          sts_balance: number
+          sts_spent: number
+          updated_at: string
+          user_id: string
+          vac_balance: number
+        }
+        Insert: {
+          budget?: number
+          created_at?: string
+          ess_allocated?: number
+          ess_spent?: number
+          fed_balance?: number
+          fed_earnings?: number
+          fun_allocated?: number
+          fun_spent?: number
+          housing?: number
+          id?: string
+          income?: number
+          lts_balance?: number
+          lts_contribution?: number
+          month: string
+          notes?: string | null
+          regions_balance?: number
+          source?: string
+          sts_allocated?: number
+          sts_balance?: number
+          sts_spent?: number
+          updated_at?: string
+          user_id: string
+          vac_balance?: number
+        }
+        Update: {
+          budget?: number
+          created_at?: string
+          ess_allocated?: number
+          ess_spent?: number
+          fed_balance?: number
+          fed_earnings?: number
+          fun_allocated?: number
+          fun_spent?: number
+          housing?: number
+          id?: string
+          income?: number
+          lts_balance?: number
+          lts_contribution?: number
+          month?: string
+          notes?: string | null
+          regions_balance?: number
+          source?: string
+          sts_allocated?: number
+          sts_balance?: number
+          sts_spent?: number
+          updated_at?: string
+          user_id?: string
+          vac_balance?: number
+        }
+        Relationships: []
+      }
       pantry_items: {
         Row: {
           created_at: string
@@ -412,6 +493,45 @@ export type Database = {
           display_name?: string | null
           id?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      raw_imports: {
+        Row: {
+          content_type: string | null
+          created_at: string
+          filename: string
+          id: string
+          imported_rows: number
+          kind: string
+          size_bytes: number | null
+          storage_path: string | null
+          summary: Json
+          user_id: string
+        }
+        Insert: {
+          content_type?: string | null
+          created_at?: string
+          filename: string
+          id?: string
+          imported_rows?: number
+          kind?: string
+          size_bytes?: number | null
+          storage_path?: string | null
+          summary?: Json
+          user_id: string
+        }
+        Update: {
+          content_type?: string | null
+          created_at?: string
+          filename?: string
+          id?: string
+          imported_rows?: number
+          kind?: string
+          size_bytes?: number | null
+          storage_path?: string | null
+          summary?: Json
+          user_id?: string
         }
         Relationships: []
       }
@@ -593,7 +713,7 @@ export type Database = {
       }
       transactions: {
         Row: {
-          account_id: string
+          account_id: string | null
           amount: number
           category_id: string | null
           created_at: string
@@ -606,7 +726,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          account_id: string
+          account_id?: string | null
           amount: number
           category_id?: string | null
           created_at?: string
@@ -619,7 +739,7 @@ export type Database = {
           user_id: string
         }
         Update: {
-          account_id?: string
+          account_id?: string | null
           amount?: number
           category_id?: string | null
           created_at?: string
@@ -734,7 +854,13 @@ export type Database = {
       storage_location: "pantry" | "fridge" | "freezer" | "other"
       task_kind: "general" | "shopping"
       task_priority: "low" | "normal" | "high"
-      txn_type: "expense" | "income" | "transfer"
+      txn_type:
+        | "expense"
+        | "income"
+        | "transfer"
+        | "savings_contribution"
+        | "investment_contribution"
+        | "adjustment"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -878,7 +1004,14 @@ export const Constants = {
       storage_location: ["pantry", "fridge", "freezer", "other"],
       task_kind: ["general", "shopping"],
       task_priority: ["low", "normal", "high"],
-      txn_type: ["expense", "income", "transfer"],
+      txn_type: [
+        "expense",
+        "income",
+        "transfer",
+        "savings_contribution",
+        "investment_contribution",
+        "adjustment",
+      ],
     },
   },
 } as const

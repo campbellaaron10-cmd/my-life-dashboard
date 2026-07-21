@@ -32,6 +32,7 @@ export const qk = {
   recipeIngredients: (recipeId: string) => ["recipe_ingredients", recipeId] as const,
   financeSettings: ["finance_settings"] as const,
   balanceSnapshots: ["balance_snapshots"] as const,
+  monthlySummaries: ["monthly_summaries"] as const,
 };
 
 async function currentUserId() {
@@ -101,7 +102,7 @@ export function useTransactions(limit?: number) {
 export function useUpsertTransaction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: Partial<Transaction> & { merchant: string; amount: number; account_id: string }) => {
+    mutationFn: async (input: Partial<Transaction> & { merchant: string; amount: number }) => {
       const user_id = await currentUserId();
       const { data, error } = await supabase.from("transactions").upsert({ ...input, user_id }).select().single();
       if (error) throw error;
@@ -174,6 +175,7 @@ export function useDeleteBudget() {
 
 // ---------- Finance settings ----------
 export const DEFAULT_CATEGORIES = [
+  { code: "HOU", name: "Housing & Utilities", kind: "spending", sort_order: 0, rollover: false },
   { code: "ESS", name: "Essentials", kind: "spending", sort_order: 1, rollover: false },
   { code: "FUN", name: "Fun", kind: "spending", sort_order: 2, rollover: true },
   { code: "STS", name: "Short-Term Savings", kind: "savings", sort_order: 3, rollover: true },
@@ -181,6 +183,33 @@ export const DEFAULT_CATEGORIES = [
   { code: "LTS", name: "Long-Term Savings", kind: "investment", sort_order: 5, rollover: true },
   { code: "FED", name: "Fidelity Investments", kind: "investment", sort_order: 6, rollover: true },
 ] as const;
+
+export type MonthlySummary = Tables["monthly_summaries"]["Row"];
+export type MonthlySummaryInsert = Tables["monthly_summaries"]["Insert"];
+
+/** Editable financial rules stored in finance_settings.rules (JSONB). */
+export type FinanceRules = {
+  ess_pct: number;        // % of budget → Essentials
+  fun_pct: number;        // % of budget → Fun
+  sts_pct: number;        // % of budget → Short-Term Savings
+  fun_to_vac_pct: number; // leftover Fun → Vacation
+  fun_to_sts_pct: number; // leftover Fun → Short-Term Savings
+  fun_to_fun_pct: number; // leftover Fun → next month Fun
+  starting_regions: number;
+  starting_fed: number;
+  starting_lts: number;
+  starting_vac: number;
+  starting_sts: number;
+  rounding: "cent" | "dollar";
+  auto_close_month: boolean;
+};
+
+export const DEFAULT_RULES: FinanceRules = {
+  ess_pct: 40, fun_pct: 25, sts_pct: 35,
+  fun_to_vac_pct: 70, fun_to_sts_pct: 25, fun_to_fun_pct: 5,
+  starting_regions: 0, starting_fed: 0, starting_lts: 0, starting_vac: 0, starting_sts: 0,
+  rounding: "cent", auto_close_month: false,
+};
 
 export function useFinanceSettings() {
   return useQuery({
@@ -332,7 +361,68 @@ export function useApplyFunRollover() {
   });
 }
 
+// ---------- Monthly summaries (Excel workbook rows → DB) ----------
+export function useMonthlySummaries() {
+  return useQuery({
+    queryKey: qk.monthlySummaries,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("monthly_summaries").select("*").order("month");
+      if (error) throw error;
+      return data as MonthlySummary[];
+    },
+  });
+}
+
+export function useUpsertMonthlySummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<MonthlySummary> & { month: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase.from("monthly_summaries")
+        .upsert({ ...input, user_id }, { onConflict: "user_id,month" }).select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.monthlySummaries }); toast.success("Month saved"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteMonthlySummary() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("monthly_summaries").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.monthlySummaries }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+/** Bulk import rows from the Excel import wizard. Deduped by (user_id, month). */
+export function useBulkImportMonthlySummaries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: Partial<MonthlySummary>[]) => {
+      const user_id = await currentUserId();
+      const scoped = rows.map((r) => ({ ...r, user_id, source: r.source ?? "excel_import" }));
+      const { data, error } = await supabase.from("monthly_summaries")
+        .upsert(scoped as any, { onConflict: "user_id,month" }).select();
+      if (error) throw error;
+      return data ?? [];
+    },
+    onSuccess: (rows) => {
+      qc.invalidateQueries({ queryKey: qk.monthlySummaries });
+      toast.success(`Imported ${rows.length} month${rows.length === 1 ? "" : "s"}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 // ---------- Pantry ----------
+
 export function usePantry(opts?: UseQueryOptions<PantryItem[]>) {
   return useQuery<PantryItem[]>({
     queryKey: qk.pantry,

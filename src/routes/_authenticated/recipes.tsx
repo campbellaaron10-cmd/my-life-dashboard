@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import {
   useRecipes, useUpsertRecipe, useDeleteRecipe, useRecipe,
   useRecipeIngredients, useUpsertIngredient, useDeleteIngredient, useReorderIngredients,
@@ -781,17 +782,22 @@ function IngredientDialog({ open, initial, recipeId, foods, onClose, onSave, onD
           <div className="grid grid-cols-2 gap-3">
             <Field label="Quantity"><Input type="number" step="0.01" value={form.quantity ?? 1} onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} /></Field>
             <Field label="Unit">
-              <select className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={form.unit ?? ""} onChange={(e) => setForm({ ...form, unit: e.target.value || null })}>
-                <option value="">unit</option>
-                {measureUnits.length > 0 && (
-                  <optgroup label="From this food">
-                    {measureUnits.map((u) => <option key={u} value={u}>{u}</option>)}
-                  </optgroup>
-                )}
-                <optgroup label="Standard">
-                  {UNIT_OPTIONS.map((u) => <option key={u} value={u}>{u}</option>)}
-                </optgroup>
-              </select>
+              <Select value={form.unit ?? "__none"} onValueChange={(v) => setForm({ ...form, unit: v === "__none" ? null : v })}>
+                <SelectTrigger><SelectValue placeholder="unit" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none">unit</SelectItem>
+                  {measureUnits.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>From this food</SelectLabel>
+                      {measureUnits.map((u) => <SelectItem key={`m-${u}`} value={u}>{u}</SelectItem>)}
+                    </SelectGroup>
+                  )}
+                  <SelectGroup>
+                    <SelectLabel>Standard</SelectLabel>
+                    {UNIT_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
             </Field>
           </div>
           {currentMeasure && (
