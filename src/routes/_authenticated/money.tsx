@@ -1182,3 +1182,157 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
     </Dialog>
   );
 }
+
+// ---------- Month report (read-only detail modal) --------------------------
+function MonthReportDialog({
+  summary,
+  onClose,
+  onEdit,
+}: {
+  summary: MonthlySummary | null;
+  onClose: () => void;
+  onEdit: (s: MonthlySummary) => void;
+}) {
+  if (!summary) return null;
+  const s: any = summary;
+  const income = Number(s.income);
+  const housing = Number(s.housing);
+  const nextBudget = Math.max(0, income - housing);
+  const rows: Array<[string, number, string?]> = [
+    ["Income", income],
+    ["Housing & Utilities (HOU)", housing, SERIES_COLOR.HOU],
+    ["Budget", Number(s.budget)],
+    ["Essentials spent (ESS)", Number(s.ess_spent), SERIES_COLOR.ESS],
+    ["Fun allocated (FUN)", Number(s.fun_allocated), SERIES_COLOR.FUN],
+    ["Fun spent (FUN)", Number(s.fun_spent), SERIES_COLOR.FUN],
+    ["Short-Term Savings balance (STS)", Number(s.sts_balance), SERIES_COLOR.STS],
+    ["Vacation balance (VAC)", Number(s.vac_balance), SERIES_COLOR.VAC],
+    ["Long-Term Savings balance (LTS)", Number(s.lts_balance), SERIES_COLOR.LTS],
+    ["Fidelity balance (FED)", Number(s.fed_balance), SERIES_COLOR.FED],
+    ["RSU balance (RSU)", Number(s.rsu_balance ?? 0), SERIES_COLOR.RSU],
+    ["Regions balance", Number(s.regions_balance), SERIES_COLOR.Regions],
+  ];
+
+  return (
+    <Dialog open={true} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{monthLabel(s.month)} · Monthly Report</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-xs">
+            <p className="font-medium">Rollover math</p>
+            <p className="mt-1 text-muted-foreground">
+              This month's Income ({fmt(income)}) − Housing ({fmt(housing)}) ={" "}
+              <span className="font-mono text-foreground">{fmt(nextBudget)}</span> becomes next month's budget.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-1 text-sm">
+            {rows.map(([label, value, color]) => (
+              <div
+                key={label}
+                className="flex items-baseline justify-between rounded-lg px-3 py-2"
+                style={color ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}
+              >
+                <span className="text-muted-foreground">{label}</span>
+                <span className="font-mono">{fmt(value)}</span>
+              </div>
+            ))}
+          </div>
+          {s.notes && (
+            <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-xs">
+              <p className="font-medium">Notes</p>
+              <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{s.notes}</p>
+            </div>
+          )}
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onEdit(summary)}>
+            <Pencil className="mr-1 size-4" /> Edit month
+          </Button>
+          <Button onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------- Close-month guided workflow ------------------------------------
+function CloseMonthDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const plan = useCloseMonthPlan();
+  const close = useCloseMonth();
+
+  if (!open) return null;
+  const p = plan.data;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Close prior month</DialogTitle>
+        </DialogHeader>
+        {plan.isLoading || !p ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Computing rollover plan…</p>
+        ) : (
+          <div className="space-y-4 text-sm">
+            <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Closing month</p>
+              <p className="mt-1 text-lg font-semibold">{monthLabel(p.closingMonth)}</p>
+            </div>
+
+            <section>
+              <p className="mb-2 font-medium">1. Fun money rollover</p>
+              <div className="space-y-1 rounded-xl border border-white/5 bg-white/5 p-3 font-mono text-xs">
+                <Row label="Fun budget (limit + carryover)" value={fmt(p.funBudget)} />
+                <Row label="Fun spent" value={fmt(p.funSpent)} />
+                <Row label="Leftover" value={fmt(p.funLeftover)} accent />
+                <div className="mt-1 border-t border-white/10 pt-1">
+                  <Row label={`→ Vacation (${p.rules.vac}%)`} value={fmt(p.toVac)} color={SERIES_COLOR.VAC} />
+                  <Row label={`→ Short-Term Savings (${p.rules.sts}%)`} value={fmt(p.toSts)} color={SERIES_COLOR.STS} />
+                  <Row label={`→ Next month Fun (${p.rules.fun}%)`} value={fmt(p.toFunNext)} color={SERIES_COLOR.FUN} />
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <p className="mb-2 font-medium">2. Open next month</p>
+              <div className="space-y-1 rounded-xl border border-white/5 bg-white/5 p-3 font-mono text-xs">
+                <Row label="This month's income" value={fmt(p.income)} />
+                <Row label="This month's Housing & Utilities" value={fmt(p.housing)} color={SERIES_COLOR.HOU} />
+                <div className="mt-1 border-t border-white/10 pt-1">
+                  <Row label={`→ ${monthLabel(p.nextMonth)} budget`} value={fmt(p.nextBudget)} accent />
+                </div>
+              </div>
+            </section>
+
+            <p className="text-xs text-muted-foreground">
+              A permanent snapshot is saved to Monthly History. You can still edit it later.
+            </p>
+          </div>
+        )}
+        <DialogFooter className="gap-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={async () => {
+              if (!p) return;
+              await close.mutateAsync(p);
+              onClose();
+            }}
+            disabled={!p || close.isPending}
+          >
+            {close.isPending ? "Closing…" : "Confirm & close month"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Row({ label, value, accent, color }: { label: string; value: string; accent?: boolean; color?: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className={accent ? "font-semibold text-foreground" : "text-muted-foreground"} style={color ? { color } : undefined}>{label}</span>
+      <span className={accent ? "font-semibold text-foreground" : ""}>{value}</span>
+    </div>
+  );
+}
