@@ -177,12 +177,14 @@ function FinancesDashboard() {
   const regions = findAcc("regions") ?? allAccounts.find((a) => a.type === "checking");
   const fidelity = findAcc("fidelity") ?? allAccounts.find((a) => a.type === "investment");
   const lts = findAcc("401") ?? allAccounts.find((a) => a.type === "retirement");
+  const rsu = findAcc("rsu") ?? findAcc("stock");
 
   // Balances: prefer live account balances, fall back to latest monthly summary from Excel.
   const latestSummary = allSummaries.at(-1);
   const regionsBal = regions ? accountBalance(regions, allTxns) : Number(latestSummary?.regions_balance ?? 0);
   const fedBal = fidelity ? accountBalance(fidelity, allTxns) : Number(latestSummary?.fed_balance ?? 0);
   const ltsBal = lts ? accountBalance(lts, allTxns) : Number(latestSummary?.lts_balance ?? 0);
+  const rsuBal = rsu ? accountBalance(rsu, allTxns) : Number((latestSummary as any)?.rsu_balance ?? 0);
 
   const empty = allBudgets.length === 0 && allAccounts.length === 0 && allSummaries.length === 0;
 
