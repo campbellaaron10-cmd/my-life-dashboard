@@ -317,8 +317,16 @@ function FinancesDashboard() {
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
             {allBudgets.map((c) => (
-              <BudgetRow key={c.id} cat={c} txns={allTxns} onEdit={() => setBudgetDialog(c)} />
+              <BudgetRow
+                key={c.id}
+                cat={c}
+                txns={allTxns}
+                contribution={contributionByCat.get(c.id) ?? 0}
+                balance={balanceByCode[c.code] ?? 0}
+                onEdit={() => setBudgetDialog(c)}
+              />
             ))}
+
           </div>
         )}
       </GlassCard>
