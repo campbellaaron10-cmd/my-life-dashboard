@@ -198,7 +198,7 @@ function FinancesDashboard() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="text-right">
             <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Net Worth</p>
-            <p className="font-mono text-3xl font-bold">{fmt(netWorth || (regionsBal + fedBal + ltsBal))}</p>
+            <p className="font-mono text-3xl font-bold">{fmt(netWorth || (regionsBal + fedBal + ltsBal + rsuBal))}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
             <Upload className="mr-1 size-4" /> Import
@@ -208,6 +208,60 @@ function FinancesDashboard() {
           </Button>
         </div>
       </header>
+
+      {empty && (
+        <GlassCard className="text-center">
+          <Sparkles className="mx-auto size-10 text-primary" />
+          <h2 className="mt-3 text-xl font-semibold">Set up your budget</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Create the eight default categories (Housing &amp; Utilities, Essentials, Fun, Short-Term Savings, Vacation Fund, Long-Term Savings, Fidelity Investments, Restricted Stock Units) in one click.
+          </p>
+          <Button className="mt-4" onClick={() => seed.mutate()} disabled={seed.isPending}>
+            Seed default categories
+          </Button>
+        </GlassCard>
+      )}
+
+      {/* Top tiles: 4 supporting balances + Monthly Budget summary */}
+      <div className="grid gap-4 lg:grid-cols-5">
+        <StatTile
+          label="Regions Checking"
+          value={fmt(regionsBal)}
+          hint={regions?.institution ?? "Add checking account"}
+          onClick={() => setAccountDialog(regions ?? { type: "checking", name: "Regions Checking", institution: "Regions" })}
+        />
+        <StatTile
+          label="Fidelity Investments"
+          sub="FED"
+          value={fmt(fedBal)}
+          hint={fidelity?.institution ?? "Brokerage balance"}
+          onClick={() => setAccountDialog(fidelity ?? { type: "investment", name: "Fidelity Investments", institution: "Fidelity" })}
+          accent={SERIES_COLOR.FED}
+        />
+        <StatTile
+          label="Long-Term Savings"
+          sub="LTS · 401(k)"
+          value={fmt(ltsBal)}
+          hint={lts?.institution ?? "Retirement account"}
+          onClick={() => setAccountDialog(lts ?? { type: "retirement", name: "401(k)" })}
+          accent={SERIES_COLOR.LTS}
+        />
+        <StatTile
+          label="Restricted Stock Units"
+          sub="RSU"
+          value={fmt(rsuBal)}
+          hint={rsu?.institution ?? "Employer equity"}
+          onClick={() => setAccountDialog(rsu ?? { type: "investment", name: "Restricted Stock Units", institution: "Employer" })}
+          accent={SERIES_COLOR.RSU}
+        />
+        <MonthlyBudgetCard
+          budget={monthlyBudget}
+          allocated={totalAllocated}
+          spent={monthlySpent}
+          nextMonthIncome={monthlyIncome}
+        />
+      </div>
+
 
       {empty && (
         <GlassCard className="text-center">
