@@ -156,7 +156,7 @@ function FinancesDashboard() {
   // Current-month budget comes from the stored monthly summary created when
   // the prior month was closed. Do NOT invent one from prior income/housing —
   // the workbook rule is applied by the Close-Month workflow, not here.
-  const priorSummary = allSummaries.find((s) => s.month === prevMonthKey);
+  void prevMonthKey;
   const currentSummary = allSummaries.find((s) => s.month === curMonthKey);
   const monthlyBudget = currentSummary ? Number(currentSummary.budget) : 0;
   const budgetIsSet = !!currentSummary;
