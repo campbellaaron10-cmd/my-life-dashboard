@@ -521,35 +521,34 @@ function StatTile({ label, sub, value, hint, onClick, accent }: { label: string;
 }
 
 function MonthlyBudgetCard({
-  budget, budgetIsSet, allocated, spent, nextMonthIncome,
+  budget, budgetIsSet, spent, nextMonthIncome, priorMonthLabel,
 }: {
-  budget: number; budgetIsSet: boolean; allocated: number; spent: number; nextMonthIncome: number;
+  budget: number; budgetIsSet: boolean; spent: number; nextMonthIncome: number; priorMonthLabel: string;
 }) {
-  const remainingToAllocate = budget - allocated;
-  const remainingToSpend = budget - spent;
-  const overAllocated = remainingToAllocate < -0.005;
+  const remaining = budget - spent;
+  const overspent = remaining < -0.005;
   return (
     <div className="glass-panel rounded-2xl border border-primary/40 p-5">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Current Budget</p>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Starting Budget</p>
       <p className="mt-2 font-mono text-2xl font-bold">{fmt(budget)}</p>
-      {!budgetIsSet && (
+      {budgetIsSet ? (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Based on {priorMonthLabel} income after month closing.
+        </p>
+      ) : (
         <p className="mt-1 text-[10px] text-warning">
           Not set — close prior month to establish this month's budget.
         </p>
       )}
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <span className="text-muted-foreground">Allocated this month</span>
-        <span className="text-right font-mono">{fmt(allocated)}</span>
         <span className="text-muted-foreground">Spent this month</span>
         <span className="text-right font-mono">{fmt(spent)}</span>
-        <span className={overAllocated ? "text-warning" : "text-muted-foreground"}>Remaining to allocate</span>
-        <span className={`text-right font-mono ${overAllocated ? "text-warning" : ""}`}>{fmt(remainingToAllocate)}</span>
-        <span className={remainingToSpend < 0 ? "text-warning" : "text-muted-foreground"}>Remaining to spend</span>
-        <span className={`text-right font-mono ${remainingToSpend < 0 ? "text-warning" : ""}`}>{fmt(remainingToSpend)}</span>
+        <span className={overspent ? "text-warning" : "text-muted-foreground"}>Remaining budget</span>
+        <span className={`text-right font-mono ${overspent ? "text-warning" : ""}`}>{fmt(remaining)}</span>
       </div>
-      {overAllocated && (
+      {overspent && (
         <p className="mt-2 text-[11px] text-warning">
-          ⚠ Monthly plan is overallocated by {fmt(Math.abs(remainingToAllocate))}.
+          ⚠ Over budget by {fmt(Math.abs(remaining))}.
         </p>
       )}
       <div className="mt-3 border-t border-white/10 pt-2 text-xs">
@@ -558,8 +557,7 @@ function MonthlyBudgetCard({
           <span className="text-right font-mono text-primary">{fmt(nextMonthIncome)}</span>
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Only spending-category allocations reduce "Remaining to allocate". Cumulative
-          balances stay separate.
+          Income earned this month becomes next month's budget after closing.
         </p>
       </div>
     </div>
@@ -568,16 +566,21 @@ function MonthlyBudgetCard({
 
 
 function BudgetRow({
-  cat, txns, contribution, balance, onEdit,
+  cat, txns, contribution, balance, summarySpent, summaryAllocation, onEdit,
 }: {
   cat: BudgetCategory;
   txns: Transaction[];
   contribution: number;
   balance: number;
+  summarySpent?: number;
+  summaryAllocation?: number;
   onEdit: () => void;
 }) {
-  const spent = budgetSpent(cat, txns);
-  const limit = Number(cat.monthly_limit);
+  const liveSpent = budgetSpent(cat, txns);
+  const spent = (summarySpent && summarySpent > 0) ? summarySpent : liveSpent;
+  const limit = (summaryAllocation && summaryAllocation > 0)
+    ? summaryAllocation
+    : Number(cat.monthly_limit);
   const goal = cat.goal_amount ? Number(cat.goal_amount) : null;
   const label = CATEGORY_LABELS[cat.code] ?? { long: cat.name, short: cat.code };
   const accent = (cat.color && cat.color.startsWith("#")) ? cat.color : (SERIES_COLOR[cat.code] ?? "hsl(var(--primary))");
@@ -604,6 +607,7 @@ function BudgetRow({
   const pct = barMax > 0 ? Math.min(100, (barValue / barMax) * 100) : 0;
   const overspent = isSpending && limit > 0 && spent > limit;
   const goalPct = goal && goal > 0 ? Math.min(100, (balance / goal) * 100) : null;
+
 
   return (
     <button
