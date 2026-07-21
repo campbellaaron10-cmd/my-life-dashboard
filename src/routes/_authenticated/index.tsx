@@ -406,3 +406,18 @@ function EmptyLink({ to, icon: Icon, text }: { to: string; icon?: typeof Wallet;
     </Link>
   );
 }
+
+function BalanceChip({ label, sub, value, color }: { label: string; sub: string; value: string; color: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <span className="size-1.5 rounded-full" style={{ background: color }} />
+          <p className="truncate text-[11px] text-muted-foreground">{label}</p>
+        </div>
+        <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">{sub}</p>
+      </div>
+      <p className="font-mono text-sm font-semibold tracking-tight">{value}</p>
+    </div>
+  );
+}
