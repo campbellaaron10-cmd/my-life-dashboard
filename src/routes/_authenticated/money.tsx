@@ -20,7 +20,8 @@ import {
   useAccounts, useUpsertAccount, useDeleteAccount,
   useTransactions, useUpsertTransaction, useDeleteTransaction,
   useBudgets, useUpsertBudget, useDeleteBudget,
-  useFinanceSettings, useUpsertFinanceSettings, useSeedFinanceDefaults, useApplyFunRollover,
+  useFinanceSettings, useUpsertFinanceSettings, useSeedFinanceDefaults,
+  useCloseMonthPlan, useCloseMonth, type CloseMonthPlan,
   useBalanceSnapshots, useUpsertBalanceSnapshot,
   useMonthlySummaries, useUpsertMonthlySummary, useDeleteMonthlySummary, useBulkImportMonthlySummaries,
   accountBalance, budgetSpent,
@@ -59,6 +60,7 @@ const CATEGORY_LABELS: Record<string, { long: string; short: string }> = {
   VAC: { long: "Vacation Fund", short: "VAC" },
   LTS: { long: "Long-Term Savings (401(k))", short: "LTS" },
   FED: { long: "Fidelity Investments", short: "FED" },
+  RSU: { long: "Restricted Stock Units", short: "RSU" },
 };
 
 const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -76,14 +78,17 @@ const CHART = {
   tooltipBg: "rgba(15, 20, 34, 0.95)",
   tooltipBorder: "rgba(255, 255, 255, 0.18)",
 };
+// Accent color per category. Kept muted enough to sit on the dark glass panels.
+// (FED/STS colors swapped per user request; RSU added.)
 const SERIES_COLOR: Record<string, string> = {
   HOU: "#f59e0b",
   ESS: "#38bdf8",
   FUN: "#a78bfa",
-  STS: "#34d399",
+  STS: "#22d3ee",  // was FED cyan
   VAC: "#f472b6",
   LTS: "#fbbf24",
-  FED: "#22d3ee",
+  FED: "#34d399",  // was STS green
+  RSU: "#c084fc",
   Regions: "#94a3b8",
 };
 
@@ -112,12 +117,13 @@ function FinancesDashboard() {
   const snapshots = useBalanceSnapshots();
   const summaries = useMonthlySummaries();
   const seed = useSeedFinanceDefaults();
-  const rollover = useApplyFunRollover();
 
   const [txnDialog, setTxnDialog] = useState<Partial<Transaction> | null>(null);
   const [budgetDialog, setBudgetDialog] = useState<Partial<BudgetCategory> | null>(null);
   const [accountDialog, setAccountDialog] = useState<Partial<Account> | null>(null);
   const [monthDialog, setMonthDialog] = useState<Partial<MonthlySummary> | null>(null);
+  const [monthReport, setMonthReport] = useState<MonthlySummary | null>(null);
+  const [closeMonthOpen, setCloseMonthOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
@@ -171,12 +177,14 @@ function FinancesDashboard() {
   const regions = findAcc("regions") ?? allAccounts.find((a) => a.type === "checking");
   const fidelity = findAcc("fidelity") ?? allAccounts.find((a) => a.type === "investment");
   const lts = findAcc("401") ?? allAccounts.find((a) => a.type === "retirement");
+  const rsu = findAcc("rsu") ?? findAcc("stock");
 
   // Balances: prefer live account balances, fall back to latest monthly summary from Excel.
   const latestSummary = allSummaries.at(-1);
   const regionsBal = regions ? accountBalance(regions, allTxns) : Number(latestSummary?.regions_balance ?? 0);
   const fedBal = fidelity ? accountBalance(fidelity, allTxns) : Number(latestSummary?.fed_balance ?? 0);
   const ltsBal = lts ? accountBalance(lts, allTxns) : Number(latestSummary?.lts_balance ?? 0);
+  const rsuBal = rsu ? accountBalance(rsu, allTxns) : Number((latestSummary as any)?.rsu_balance ?? 0);
 
   const empty = allBudgets.length === 0 && allAccounts.length === 0 && allSummaries.length === 0;
 
@@ -190,7 +198,7 @@ function FinancesDashboard() {
         <div className="flex flex-wrap items-end gap-3">
           <div className="text-right">
             <p className="font-mono text-xs uppercase tracking-wider text-muted-foreground">Net Worth</p>
-            <p className="font-mono text-3xl font-bold">{fmt(netWorth || (regionsBal + fedBal + ltsBal))}</p>
+            <p className="font-mono text-3xl font-bold">{fmt(netWorth || (regionsBal + fedBal + ltsBal + rsuBal))}</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
             <Upload className="mr-1 size-4" /> Import
@@ -206,7 +214,7 @@ function FinancesDashboard() {
           <Sparkles className="mx-auto size-10 text-primary" />
           <h2 className="mt-3 text-xl font-semibold">Set up your budget</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Create the seven default categories (Housing &amp; Utilities, Essentials, Fun, Short-Term Savings, Vacation Fund, Long-Term Savings, Fidelity Investments) in one click.
+            Create the eight default categories (Housing &amp; Utilities, Essentials, Fun, Short-Term Savings, Vacation Fund, Long-Term Savings, Fidelity Investments, Restricted Stock Units) in one click.
           </p>
           <Button className="mt-4" onClick={() => seed.mutate()} disabled={seed.isPending}>
             Seed default categories
@@ -214,8 +222,8 @@ function FinancesDashboard() {
         </GlassCard>
       )}
 
-      {/* Top tiles: 3 supporting balances + Monthly Budget summary */}
-      <div className="grid gap-4 lg:grid-cols-4">
+      {/* Top tiles: 4 supporting balances + Monthly Budget summary */}
+      <div className="grid gap-4 lg:grid-cols-5">
         <StatTile
           label="Regions Checking"
           value={fmt(regionsBal)}
@@ -228,6 +236,7 @@ function FinancesDashboard() {
           value={fmt(fedBal)}
           hint={fidelity?.institution ?? "Brokerage balance"}
           onClick={() => setAccountDialog(fidelity ?? { type: "investment", name: "Fidelity Investments", institution: "Fidelity" })}
+          accent={SERIES_COLOR.FED}
         />
         <StatTile
           label="Long-Term Savings"
@@ -235,15 +244,24 @@ function FinancesDashboard() {
           value={fmt(ltsBal)}
           hint={lts?.institution ?? "Retirement account"}
           onClick={() => setAccountDialog(lts ?? { type: "retirement", name: "401(k)" })}
+          accent={SERIES_COLOR.LTS}
+        />
+        <StatTile
+          label="Restricted Stock Units"
+          sub="RSU"
+          value={fmt(rsuBal)}
+          hint={rsu?.institution ?? "Employer equity"}
+          onClick={() => setAccountDialog(rsu ?? { type: "investment", name: "Restricted Stock Units", institution: "Employer" })}
+          accent={SERIES_COLOR.RSU}
         />
         <MonthlyBudgetCard
           budget={monthlyBudget}
-          income={monthlyIncome || Number(currentSummary?.income ?? 0)}
           allocated={totalAllocated}
-          spent={monthlySpent || Number(currentSummary?.ess_spent ?? 0) + Number(currentSummary?.fun_spent ?? 0)}
-          unallocated={unallocated}
+          spent={monthlySpent}
+          nextMonthIncome={monthlyIncome}
         />
       </div>
+
 
       {/* Categories */}
       <GlassCard>
@@ -255,12 +273,7 @@ function FinancesDashboard() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => { if (confirm("Close previous month and apply Fun-money rollover?")) rollover.mutate(); }}
-              disabled={rollover.isPending}
-            >
+            <Button size="sm" variant="outline" onClick={() => setCloseMonthOpen(true)}>
               <RefreshCw className="mr-1 size-4" /> Close prior month
             </Button>
             <Button size="sm" variant="secondary" onClick={() => setBudgetDialog({ kind: "spending", rollover: true })}>
@@ -350,7 +363,11 @@ function FinancesDashboard() {
               </thead>
               <tbody>
                 {allSummaries.map((s) => (
-                  <tr key={s.id} className="border-t border-white/5 hover:bg-white/5">
+                  <tr
+                    key={s.id}
+                    className="cursor-pointer border-t border-white/5 hover:bg-white/5"
+                    onClick={() => setMonthReport(s)}
+                  >
                     <td className="p-2 font-mono">{monthLabel(s.month)}</td>
                     <td className="p-2 text-right font-mono">{fmt(Number(s.income))}</td>
                     <td className="p-2 text-right font-mono">{fmt(Number(s.housing))}</td>
@@ -362,7 +379,10 @@ function FinancesDashboard() {
                     <td className="p-2 text-right font-mono">{fmt(Number(s.lts_balance))}</td>
                     <td className="p-2 text-right font-mono">{fmt(Number(s.fed_balance))}</td>
                     <td className="p-2 text-right">
-                      <button className="text-muted-foreground hover:text-primary" onClick={() => setMonthDialog(s)}>
+                      <button
+                        className="text-muted-foreground hover:text-primary"
+                        onClick={(e) => { e.stopPropagation(); setMonthDialog(s); }}
+                      >
                         <Pencil className="size-3.5" />
                       </button>
                     </td>
@@ -404,6 +424,12 @@ function FinancesDashboard() {
       <BudgetDialog open={budgetDialog !== null} initial={budgetDialog} onClose={() => setBudgetDialog(null)} />
       <AccountDialog open={accountDialog !== null} initial={accountDialog} onClose={() => setAccountDialog(null)} />
       <MonthDialog open={monthDialog !== null} initial={monthDialog} onClose={() => setMonthDialog(null)} />
+      <MonthReportDialog
+        summary={monthReport}
+        onClose={() => setMonthReport(null)}
+        onEdit={(s) => { setMonthReport(null); setMonthDialog(s); }}
+      />
+      <CloseMonthDialog open={closeMonthOpen} onClose={() => setCloseMonthOpen(false)} />
       <SettingsDialog open={settingsOpen} settingsRow={settings.data ?? null} onClose={() => setSettingsOpen(false)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
@@ -411,30 +437,46 @@ function FinancesDashboard() {
 }
 
 // --- Building blocks ------------------------------------------------------
-function StatTile({ label, sub, value, hint, onClick }: { label: string; sub?: string; value: string; hint?: string; onClick?: () => void }) {
+function StatTile({ label, sub, value, hint, onClick, accent }: { label: string; sub?: string; value: string; hint?: string; onClick?: () => void; accent?: string }) {
   const Comp: any = onClick ? "button" : "div";
   return (
-    <Comp onClick={onClick} className={`glass-panel rounded-2xl p-5 text-left transition-all ${onClick ? "hover:bg-white/5" : ""}`}>
+    <Comp
+      onClick={onClick}
+      className={`glass-panel relative overflow-hidden rounded-2xl p-5 text-left transition-all ${onClick ? "hover:bg-white/5" : ""}`}
+      style={accent ? { boxShadow: `inset 3px 0 0 ${accent}` } : undefined}
+    >
       <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
         {label}{sub && <span className="ml-1 opacity-70">· {sub}</span>}
       </p>
-      <p className="mt-2 font-mono text-2xl font-bold">{value}</p>
+      <p className="mt-2 font-mono text-2xl font-bold" style={accent ? { color: accent } : undefined}>{value}</p>
       {hint && <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>}
     </Comp>
   );
 }
 
-function MonthlyBudgetCard({ budget, income, allocated, spent, unallocated }: { budget: number; income: number; allocated: number; spent: number; unallocated: number }) {
+function MonthlyBudgetCard({ budget, allocated, spent, nextMonthIncome }: { budget: number; allocated: number; spent: number; nextMonthIncome: number }) {
+  const available = budget - allocated;
+  const remaining = budget - spent;
   return (
     <div className="glass-panel rounded-2xl border border-primary/40 p-5">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Monthly Budget</p>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Current Budget</p>
       <p className="mt-2 font-mono text-2xl font-bold">{fmt(budget)}</p>
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <span className="text-muted-foreground">Income</span><span className="text-right font-mono">{fmt(income)}</span>
-        <span className="text-muted-foreground">Allocated</span><span className="text-right font-mono">{fmt(allocated)}</span>
-        <span className="text-muted-foreground">Spent</span><span className="text-right font-mono">{fmt(spent)}</span>
-        <span className={unallocated < 0 ? "text-warning" : "text-muted-foreground"}>Unallocated</span>
-        <span className={`text-right font-mono ${unallocated < 0 ? "text-warning" : ""}`}>{fmt(unallocated)}</span>
+        <span className={available < 0 ? "text-warning" : "text-muted-foreground"}>Budget Available</span>
+        <span className={`text-right font-mono ${available < 0 ? "text-warning" : ""}`}>{fmt(available)}</span>
+        <span className="text-muted-foreground">Amount Spent</span>
+        <span className="text-right font-mono">{fmt(spent)}</span>
+        <span className={remaining < 0 ? "text-warning" : "text-muted-foreground"}>Remaining Budget</span>
+        <span className={`text-right font-mono ${remaining < 0 ? "text-warning" : ""}`}>{fmt(remaining)}</span>
+      </div>
+      <div className="mt-3 border-t border-white/10 pt-2 text-xs">
+        <div className="grid grid-cols-2 gap-x-3">
+          <span className="text-muted-foreground">Next Month Income</span>
+          <span className="text-right font-mono text-primary">{fmt(nextMonthIncome)}</span>
+        </div>
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Income this month becomes next month's budget after closing.
+        </p>
       </div>
     </div>
   );
@@ -451,13 +493,18 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
   const goal = cat.goal_amount ? Number(cat.goal_amount) : null;
   const goalPct = goal && goal > 0 ? Math.min(100, (roll / goal) * 100) : null;
   const label = CATEGORY_LABELS[cat.code] ?? { long: cat.name, short: cat.code };
-  const bar = pct >= 100 ? "bg-warning" : isSaving ? "bg-accent" : "bg-primary";
+  const accent = (cat.color && cat.color.startsWith("#")) ? cat.color : (SERIES_COLOR[cat.code] ?? "hsl(var(--primary))");
+  const overspent = pct >= 100 && !isSaving;
 
   return (
-    <button onClick={onEdit} className="rounded-2xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:bg-white/10">
+    <button
+      onClick={onEdit}
+      className="rounded-2xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:bg-white/10"
+      style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
+    >
       <div className="mb-2 flex items-baseline justify-between">
         <div>
-          <p className="text-base font-semibold">
+          <p className="text-base font-semibold" style={{ color: accent }}>
             {label.long} <span className="ml-1 font-mono text-[10px] uppercase text-muted-foreground">{label.short}</span>
           </p>
           <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
@@ -468,8 +515,11 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
           {isSaving ? `${fmt(spent)} contributed` : `${fmt(spent)} / ${fmt(available)}`}
         </p>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
-        <div className={`h-full transition-all ${bar}`} style={{ width: `${pct}%` }} />
+      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: overspent ? "hsl(var(--warning))" : accent }}
+        />
       </div>
       <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
         <span>Budgeted {fmt(limit)}{roll ? ` · carryover ${fmt(roll)}` : ""}</span>
@@ -522,16 +572,17 @@ type ChartMode = "balances" | "monthly";
 function GrowthChart({ summaries, snapshots }: { summaries: MonthlySummary[]; snapshots: BalanceSnapshot[] }) {
   const [mode, setMode] = useState<ChartMode>("balances");
 
-  // BALANCES: cumulative Fidelity / Long-Term Savings / Vacation / Short-Term Savings / Regions.
+  // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions.
   const balanceRows = useMemo(() => summaries.map((s) => ({
     date: monthLabel(s.month),
     FED: Number(s.fed_balance),
     LTS: Number(s.lts_balance),
+    RSU: Number((s as any).rsu_balance ?? 0),
     VAC: Number(s.vac_balance),
     STS: Number(s.sts_balance),
     Regions: Number(s.regions_balance),
   })), [summaries]);
-  const balanceSeries: (keyof typeof balanceRows[number])[] = ["FED", "LTS", "VAC", "STS", "Regions"];
+  const balanceSeries: (keyof typeof balanceRows[number])[] = ["FED", "LTS", "RSU", "VAC", "STS", "Regions"];
 
   // MONTHLY activity: allocated & spent per category, month by month.
   const monthlyRows = useMemo(() => summaries.map((s) => ({
@@ -830,6 +881,8 @@ function MonthDialog({ open, initial, onClose }: { open: boolean; initial: Parti
           <Field label="Long-Term Savings balance">{num("lts_balance")}</Field>
           <Field label="Fidelity balance">{num("fed_balance")}</Field>
           <Field label="Fidelity earnings">{num("fed_earnings")}</Field>
+          <Field label="RSU balance">{num("rsu_balance" as any)}</Field>
+          <Field label="RSU vested this month">{num("rsu_contribution" as any)}</Field>
           <Field label="Regions balance">{num("regions_balance")}</Field>
         </div>
         <DialogFooter className="gap-2">
@@ -1130,5 +1183,159 @@ function ImportDialog({ open, onClose }: { open: boolean; onClose: () => void })
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ---------- Month report (read-only detail modal) --------------------------
+function MonthReportDialog({
+  summary,
+  onClose,
+  onEdit,
+}: {
+  summary: MonthlySummary | null;
+  onClose: () => void;
+  onEdit: (s: MonthlySummary) => void;
+}) {
+  if (!summary) return null;
+  const s: any = summary;
+  const income = Number(s.income);
+  const housing = Number(s.housing);
+  const nextBudget = Math.max(0, income - housing);
+  const rows: Array<[string, number, string?]> = [
+    ["Income", income],
+    ["Housing & Utilities (HOU)", housing, SERIES_COLOR.HOU],
+    ["Budget", Number(s.budget)],
+    ["Essentials spent (ESS)", Number(s.ess_spent), SERIES_COLOR.ESS],
+    ["Fun allocated (FUN)", Number(s.fun_allocated), SERIES_COLOR.FUN],
+    ["Fun spent (FUN)", Number(s.fun_spent), SERIES_COLOR.FUN],
+    ["Short-Term Savings balance (STS)", Number(s.sts_balance), SERIES_COLOR.STS],
+    ["Vacation balance (VAC)", Number(s.vac_balance), SERIES_COLOR.VAC],
+    ["Long-Term Savings balance (LTS)", Number(s.lts_balance), SERIES_COLOR.LTS],
+    ["Fidelity balance (FED)", Number(s.fed_balance), SERIES_COLOR.FED],
+    ["RSU balance (RSU)", Number(s.rsu_balance ?? 0), SERIES_COLOR.RSU],
+    ["Regions balance", Number(s.regions_balance), SERIES_COLOR.Regions],
+  ];
+
+  return (
+    <Dialog open={true} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{monthLabel(s.month)} · Monthly Report</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-xs">
+            <p className="font-medium">Rollover math</p>
+            <p className="mt-1 text-muted-foreground">
+              This month's Income ({fmt(income)}) − Housing ({fmt(housing)}) ={" "}
+              <span className="font-mono text-foreground">{fmt(nextBudget)}</span> becomes next month's budget.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-1 text-sm">
+            {rows.map(([label, value, color]) => (
+              <div
+                key={label}
+                className="flex items-baseline justify-between rounded-lg px-3 py-2"
+                style={color ? { boxShadow: `inset 3px 0 0 ${color}` } : undefined}
+              >
+                <span className="text-muted-foreground">{label}</span>
+                <span className="font-mono">{fmt(value)}</span>
+              </div>
+            ))}
+          </div>
+          {s.notes && (
+            <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-xs">
+              <p className="font-medium">Notes</p>
+              <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{s.notes}</p>
+            </div>
+          )}
+        </div>
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={() => onEdit(summary)}>
+            <Pencil className="mr-1 size-4" /> Edit month
+          </Button>
+          <Button onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ---------- Close-month guided workflow ------------------------------------
+function CloseMonthDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const plan = useCloseMonthPlan();
+  const close = useCloseMonth();
+
+  if (!open) return null;
+  const p = plan.data;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Close prior month</DialogTitle>
+        </DialogHeader>
+        {plan.isLoading || !p ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">Computing rollover plan…</p>
+        ) : (
+          <div className="space-y-4 text-sm">
+            <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Closing month</p>
+              <p className="mt-1 text-lg font-semibold">{monthLabel(p.closingMonth)}</p>
+            </div>
+
+            <section>
+              <p className="mb-2 font-medium">1. Fun money rollover</p>
+              <div className="space-y-1 rounded-xl border border-white/5 bg-white/5 p-3 font-mono text-xs">
+                <Row label="Fun budget (limit + carryover)" value={fmt(p.funBudget)} />
+                <Row label="Fun spent" value={fmt(p.funSpent)} />
+                <Row label="Leftover" value={fmt(p.funLeftover)} accent />
+                <div className="mt-1 border-t border-white/10 pt-1">
+                  <Row label={`→ Vacation (${p.rules.vac}%)`} value={fmt(p.toVac)} color={SERIES_COLOR.VAC} />
+                  <Row label={`→ Short-Term Savings (${p.rules.sts}%)`} value={fmt(p.toSts)} color={SERIES_COLOR.STS} />
+                  <Row label={`→ Next month Fun (${p.rules.fun}%)`} value={fmt(p.toFunNext)} color={SERIES_COLOR.FUN} />
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <p className="mb-2 font-medium">2. Open next month</p>
+              <div className="space-y-1 rounded-xl border border-white/5 bg-white/5 p-3 font-mono text-xs">
+                <Row label="This month's income" value={fmt(p.income)} />
+                <Row label="This month's Housing & Utilities" value={fmt(p.housing)} color={SERIES_COLOR.HOU} />
+                <div className="mt-1 border-t border-white/10 pt-1">
+                  <Row label={`→ ${monthLabel(p.nextMonth)} budget`} value={fmt(p.nextBudget)} accent />
+                </div>
+              </div>
+            </section>
+
+            <p className="text-xs text-muted-foreground">
+              A permanent snapshot is saved to Monthly History. You can still edit it later.
+            </p>
+          </div>
+        )}
+        <DialogFooter className="gap-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button
+            onClick={async () => {
+              if (!p) return;
+              await close.mutateAsync(p);
+              onClose();
+            }}
+            disabled={!p || close.isPending}
+          >
+            {close.isPending ? "Closing…" : "Confirm & close month"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Row({ label, value, accent, color }: { label: string; value: string; accent?: boolean; color?: string }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <span className={accent ? "font-semibold text-foreground" : "text-muted-foreground"} style={color ? { color } : undefined}>{label}</span>
+      <span className={accent ? "font-semibold text-foreground" : ""}>{value}</span>
+    </div>
   );
 }
