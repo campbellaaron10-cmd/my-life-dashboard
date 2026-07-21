@@ -73,6 +73,10 @@ function Dashboard() {
   const { mode } = usePrivacyMode();
   const finance = useFinanceSummary();
 
+  // Rotating boot-up status — stable for the life of this dashboard mount.
+  const status = useMemo(() => pickStatus(), []);
+  const greeting = useMemo(() => pickGreeting(), []);
+
   // ---- Derived (kept small; only what the widgets need) ----
   const expiring = useMemo(() =>
     (pantry.data ?? [])
@@ -86,7 +90,7 @@ function Dashboard() {
   const todayTasks = openTasks.filter((t) => t.kind !== "shopping").slice(0, 5);
   const shopping = openTasks.filter((t) => t.kind === "shopping");
 
-  // ---- Atlas Briefing: dynamic, high-signal only ----
+  // ---- Atlas Briefing: actionable, time-sensitive, or anomalous only ----
   const briefing = useMemo(() => {
     const items: { text: string; tone?: "warn" | "info" | "good" }[] = [];
     const now = new Date();
@@ -95,13 +99,12 @@ function Dashboard() {
     const monthProgress = dayOfMonth / daysInMonth;
 
     if (mode === "private") {
-      // Spending pace: only flag when spent% outpaces month progress by >20pts
-      // AND we're past day 3 (avoid noise early in the month).
-      if (dayOfMonth > 3 && finance.monthlyBudget > 0) {
+      // Budget pace: only for categories with a valid allocation > 0, after day 3.
+      if (dayOfMonth > 3) {
         for (const code of ["HOU", "ESS", "FUN"] as const) {
-          const spent = finance.spentByCode[code] ?? 0;
           const alloc = finance.allocByCode[code] ?? 0;
-          if (alloc <= 0) continue;
+          if (alloc <= 0) continue; // no configured allocation → skip silently
+          const spent = finance.spentByCode[code] ?? 0;
           const spentPct = spent / alloc;
           if (spentPct >= 0.95) {
             items.push({ text: `${CATEGORY_LABELS[code].long} nearly spent — ${Math.round(spentPct * 100)}% of allocation.`, tone: "warn" });
@@ -110,23 +113,15 @@ function Dashboard() {
           }
         }
       }
-      // Savings milestone: check if VAC/STS crossed a $500 threshold vs prior month.
-      const prior = finance.summaries.at(-2);
-      const latest = finance.summaries.at(-1);
-      if (prior && latest) {
-        for (const [code, key] of [
-          ["VAC", "vac_balance"], ["STS", "sts_balance"], ["LTS", "lts_balance"], ["FED", "fed_balance"],
-        ] as const) {
-          const p = Math.floor(Number((prior as any)[key] ?? 0) / 500);
-          const l = Math.floor(Number((latest as any)[key] ?? 0) / 500);
-          if (l > p) {
-            items.push({ text: `${CATEGORY_LABELS[code].long} passed ${fmt(l * 500)}.`, tone: "good" });
-          }
-        }
+      // Month-close reminder: prior month has no summary yet.
+      const priorKey = `${new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10).replace(/-\d{2}$/, "-01")}`;
+      const hasPrior = finance.summaries.some((s) => s.month === priorKey);
+      if (!hasPrior && finance.summaries.length > 0) {
+        items.push({ text: `${finance.priorMonthLabel} hasn't been closed yet.`, tone: "info" });
       }
     }
 
-    // Pantry: only 0–2 day windows
+    // Pantry: 0–2 day windows
     const urgent = expiring.filter((e) => (e.days ?? 99) <= 2);
     if (urgent.length) {
       const first = urgent[0];
@@ -165,8 +160,8 @@ function Dashboard() {
     <div className="space-y-8">
       <header className="flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Command Center</p>
-          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">{pickGreeting()}</h1>
+          <p className="mb-2 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">{status}</p>
+          <h1 className="text-4xl font-bold tracking-tight md:text-5xl">{greeting}</h1>
         </div>
         <Link to="/weather" className="text-right transition-opacity hover:opacity-80">
           <p className="flex items-center justify-end gap-2 text-4xl font-light tracking-tight">
