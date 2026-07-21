@@ -572,16 +572,17 @@ type ChartMode = "balances" | "monthly";
 function GrowthChart({ summaries, snapshots }: { summaries: MonthlySummary[]; snapshots: BalanceSnapshot[] }) {
   const [mode, setMode] = useState<ChartMode>("balances");
 
-  // BALANCES: cumulative Fidelity / Long-Term Savings / Vacation / Short-Term Savings / Regions.
+  // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions.
   const balanceRows = useMemo(() => summaries.map((s) => ({
     date: monthLabel(s.month),
     FED: Number(s.fed_balance),
     LTS: Number(s.lts_balance),
+    RSU: Number((s as any).rsu_balance ?? 0),
     VAC: Number(s.vac_balance),
     STS: Number(s.sts_balance),
     Regions: Number(s.regions_balance),
   })), [summaries]);
-  const balanceSeries: (keyof typeof balanceRows[number])[] = ["FED", "LTS", "VAC", "STS", "Regions"];
+  const balanceSeries: (keyof typeof balanceRows[number])[] = ["FED", "LTS", "RSU", "VAC", "STS", "Regions"];
 
   // MONTHLY activity: allocated & spent per category, month by month.
   const monthlyRows = useMemo(() => summaries.map((s) => ({
