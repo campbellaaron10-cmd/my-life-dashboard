@@ -421,6 +421,7 @@ export function useBulkImportMonthlySummaries() {
   });
 }
 
+// ---------- Pantry ----------
 
 export function usePantry(opts?: UseQueryOptions<PantryItem[]>) {
   return useQuery<PantryItem[]>({
