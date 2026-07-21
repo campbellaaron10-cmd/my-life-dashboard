@@ -539,19 +539,43 @@ function MonthlyBudgetCard({
 }
 
 
-function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transaction[]; onEdit: () => void }) {
+function BudgetRow({
+  cat, txns, contribution, balance, onEdit,
+}: {
+  cat: BudgetCategory;
+  txns: Transaction[];
+  contribution: number;
+  balance: number;
+  onEdit: () => void;
+}) {
   const spent = budgetSpent(cat, txns);
   const limit = Number(cat.monthly_limit);
-  const roll = Number(cat.rollover_balance);
-  const available = limit + roll;
-  const pct = available > 0 ? Math.min(100, (spent / available) * 100) : 0;
-  const remaining = available - spent;
-  const isSaving = cat.kind !== "spending";
   const goal = cat.goal_amount ? Number(cat.goal_amount) : null;
-  const goalPct = goal && goal > 0 ? Math.min(100, (roll / goal) * 100) : null;
   const label = CATEGORY_LABELS[cat.code] ?? { long: cat.name, short: cat.code };
   const accent = (cat.color && cat.color.startsWith("#")) ? cat.color : (SERIES_COLOR[cat.code] ?? "hsl(var(--primary))");
-  const overspent = pct >= 100 && !isSaving;
+
+  const isSpending = cat.kind === "spending";
+  const isSavings = cat.kind === "savings";
+
+  // Spending: bar tracks spent vs monthly allocation.
+  // Savings/investment: bar tracks actual contribution vs planned contribution (or goal for savings).
+  let barValue = 0;
+  let barMax = 0;
+  let headline = "";
+  if (isSpending) {
+    barValue = spent;
+    barMax = limit;
+    headline = `${fmt(spent)} / ${fmt(limit)}`;
+  } else {
+    barValue = contribution;
+    barMax = limit > 0 ? limit : (goal ?? 0);
+    headline = limit > 0
+      ? `${fmt(contribution)} / ${fmt(limit)} planned`
+      : `${fmt(contribution)} contributed`;
+  }
+  const pct = barMax > 0 ? Math.min(100, (barValue / barMax) * 100) : 0;
+  const overspent = isSpending && limit > 0 && spent > limit;
+  const goalPct = goal && goal > 0 ? Math.min(100, (balance / goal) * 100) : null;
 
   return (
     <button
@@ -568,9 +592,7 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
             {cat.kind}{cat.rollover ? " · rolls over" : ""}
           </p>
         </div>
-        <p className="font-mono text-sm">
-          {isSaving ? `${fmt(spent)} contributed` : `${fmt(spent)} / ${fmt(available)}`}
-        </p>
+        <p className="font-mono text-sm">{headline}</p>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
         <div
@@ -578,11 +600,24 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
           style={{ width: `${pct}%`, backgroundColor: overspent ? "hsl(var(--warning))" : accent }}
         />
       </div>
-      <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
-        <span>Budgeted {fmt(limit)}{roll ? ` · carryover ${fmt(roll)}` : ""}</span>
-        <span className={remaining < 0 ? "text-warning" : ""}>Remaining {fmt(remaining)}</span>
-      </div>
-      {goalPct != null && (
+
+      {isSpending ? (
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
+          <span>Monthly allocation {fmt(limit)}</span>
+          <span className={limit - spent < 0 ? "text-warning" : ""}>Remaining {fmt(limit - spent)}</span>
+        </div>
+      ) : (
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>Planned contribution</span>
+          <span className="text-right font-mono">{fmt(limit)}</span>
+          <span>Actual this month</span>
+          <span className="text-right font-mono">{fmt(contribution)}</span>
+          <span>Current balance</span>
+          <span className="text-right font-mono" style={{ color: accent }}>{fmt(balance)}</span>
+        </div>
+      )}
+
+      {isSavings && goalPct != null && (
         <div className="mt-3">
           <div className="mb-1 flex items-baseline justify-between text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1"><Target className="size-3" /> Goal {fmt(goal!)}</span>
@@ -596,6 +631,7 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
     </button>
   );
 }
+
 
 function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction; account?: Account; category?: BudgetCategory; isCredit: boolean; onEdit: () => void }) {
   const del = useDeleteTransaction();
