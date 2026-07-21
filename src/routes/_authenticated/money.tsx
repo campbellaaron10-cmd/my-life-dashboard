@@ -263,50 +263,6 @@ function FinancesDashboard() {
       </div>
 
 
-      {empty && (
-        <GlassCard className="text-center">
-          <Sparkles className="mx-auto size-10 text-primary" />
-          <h2 className="mt-3 text-xl font-semibold">Set up your budget</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Create the seven default categories (Housing &amp; Utilities, Essentials, Fun, Short-Term Savings, Vacation Fund, Long-Term Savings, Fidelity Investments) in one click.
-          </p>
-          <Button className="mt-4" onClick={() => seed.mutate()} disabled={seed.isPending}>
-            Seed default categories
-          </Button>
-        </GlassCard>
-      )}
-
-      {/* Top tiles: 3 supporting balances + Monthly Budget summary */}
-      <div className="grid gap-4 lg:grid-cols-4">
-        <StatTile
-          label="Regions Checking"
-          value={fmt(regionsBal)}
-          hint={regions?.institution ?? "Add checking account"}
-          onClick={() => setAccountDialog(regions ?? { type: "checking", name: "Regions Checking", institution: "Regions" })}
-        />
-        <StatTile
-          label="Fidelity Investments"
-          sub="FED"
-          value={fmt(fedBal)}
-          hint={fidelity?.institution ?? "Brokerage balance"}
-          onClick={() => setAccountDialog(fidelity ?? { type: "investment", name: "Fidelity Investments", institution: "Fidelity" })}
-        />
-        <StatTile
-          label="Long-Term Savings"
-          sub="LTS · 401(k)"
-          value={fmt(ltsBal)}
-          hint={lts?.institution ?? "Retirement account"}
-          onClick={() => setAccountDialog(lts ?? { type: "retirement", name: "401(k)" })}
-        />
-        <MonthlyBudgetCard
-          budget={monthlyBudget}
-          income={monthlyIncome || Number(currentSummary?.income ?? 0)}
-          allocated={totalAllocated}
-          spent={monthlySpent || Number(currentSummary?.ess_spent ?? 0) + Number(currentSummary?.fun_spent ?? 0)}
-          unallocated={unallocated}
-        />
-      </div>
-
       {/* Categories */}
       <GlassCard>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
