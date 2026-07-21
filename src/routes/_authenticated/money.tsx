@@ -152,20 +152,36 @@ function FinancesDashboard() {
       .reduce((s, t) => s + Number(t.amount), 0),
     [allTxns, monthStart, nextMonthStart],
   );
-  const monthlySpent = useMemo(
-    () => allTxns
-      .filter((t) => t.type === "expense" && new Date(t.occurred_on) >= monthStart && new Date(t.occurred_on) < nextMonthStart)
-      .reduce((s, t) => s + Number(t.amount), 0),
-    [allTxns, monthStart, nextMonthStart],
-  );
 
   // Current-month budget comes from the stored monthly summary created when
   // the prior month was closed. Do NOT invent one from prior income/housing —
   // the workbook rule is applied by the Close-Month workflow, not here.
-  const priorSummary = allSummaries.find((s) => s.month === prevMonthKey);
+  void prevMonthKey;
   const currentSummary = allSummaries.find((s) => s.month === curMonthKey);
   const monthlyBudget = currentSummary ? Number(currentSummary.budget) : 0;
   const budgetIsSet = !!currentSummary;
+
+  // Spending per spending-category — sourced from the imported monthly
+  // summary when present, falling back to live transactions.
+  const summarySpentByCode: Record<string, number> = {
+    HOU: Number(currentSummary?.housing ?? 0),
+    ESS: Number(currentSummary?.ess_spent ?? 0),
+    FUN: Number(currentSummary?.fun_spent ?? 0),
+  };
+  // Savings / investment "actual contribution this month" from the summary.
+  const summaryContribByCode: Record<string, number> = {
+    STS: Number(currentSummary?.sts_spent ?? 0),
+    LTS: Number(currentSummary?.lts_contribution ?? 0),
+    FED: Number(currentSummary?.fed_earnings ?? 0),
+    RSU: Number(currentSummary?.rsu_contribution ?? 0),
+  };
+  // Planned allocation overrides from the summary (per workbook plan).
+  const summaryAllocByCode: Record<string, number> = {
+    HOU: Number(currentSummary?.housing ?? 0),
+    ESS: Number(currentSummary?.ess_allocated ?? 0),
+    FUN: Number(currentSummary?.fun_allocated ?? 0),
+    STS: Number(currentSummary?.sts_allocated ?? 0),
+  };
 
   // Contribution this month, per category: sum of savings_contribution /
   // investment_contribution transactions tagged to that category.
@@ -192,12 +208,20 @@ function FinancesDashboard() {
     RSU: Number((latestSummary as any)?.rsu_balance ?? 0),
   };
 
-  // "Allocated this month" only counts spending categories. Cumulative
-  // balances on savings/investment categories must not inflate this number.
-  const spendingAllocated = allBudgets
-    .filter((b) => b.kind === "spending")
-    .reduce((s, b) => s + Number(b.monthly_limit), 0);
-  const remainingToAllocate = monthlyBudget - spendingAllocated;
+  // Total spent this month — prefer imported summary sums, else live txns.
+  const summarySpendTotal =
+    summarySpentByCode.HOU + summarySpentByCode.ESS + summarySpentByCode.FUN;
+  const liveMonthlySpent = useMemo(
+    () => allTxns
+      .filter((t) => t.type === "expense" && new Date(t.occurred_on) >= monthStart && new Date(t.occurred_on) < nextMonthStart)
+      .reduce((s, t) => s + Number(t.amount), 0),
+    [allTxns, monthStart, nextMonthStart],
+  );
+  const monthlySpent = summarySpendTotal > 0 ? summarySpendTotal : liveMonthlySpent;
+
+  const priorMonthLabel = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    .toLocaleString("en-US", { month: "long" });
+
 
 
   const findAcc = (nameFragment: string) =>
@@ -285,9 +309,9 @@ function FinancesDashboard() {
         <MonthlyBudgetCard
           budget={monthlyBudget}
           budgetIsSet={budgetIsSet}
-          allocated={spendingAllocated}
           spent={monthlySpent}
           nextMonthIncome={monthlyIncome}
+          priorMonthLabel={priorMonthLabel}
         />
 
       </div>
@@ -299,9 +323,10 @@ function FinancesDashboard() {
           <div>
             <h2 className="text-xl font-semibold">This month</h2>
             <p className="text-sm text-muted-foreground">
-              Budget {fmt(monthlyBudget)} · Allocated {fmt(spendingAllocated)} · Spent {fmt(monthlySpent)} · Remaining to allocate {fmt(remainingToAllocate)}
+              Starting budget {fmt(monthlyBudget)} · Spent {fmt(monthlySpent)} · Remaining {fmt(monthlyBudget - monthlySpent)}
             </p>
           </div>
+
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => setCloseMonthOpen(true)}>
               <RefreshCw className="mr-1 size-4" /> Close prior month
@@ -321,11 +346,14 @@ function FinancesDashboard() {
                 key={c.id}
                 cat={c}
                 txns={allTxns}
-                contribution={contributionByCat.get(c.id) ?? 0}
+                contribution={Math.max(contributionByCat.get(c.id) ?? 0, summaryContribByCode[c.code] ?? 0)}
+                summarySpent={summarySpentByCode[c.code]}
+                summaryAllocation={summaryAllocByCode[c.code]}
                 balance={balanceByCode[c.code] ?? 0}
                 onEdit={() => setBudgetDialog(c)}
               />
             ))}
+
 
           </div>
         )}
@@ -493,35 +521,34 @@ function StatTile({ label, sub, value, hint, onClick, accent }: { label: string;
 }
 
 function MonthlyBudgetCard({
-  budget, budgetIsSet, allocated, spent, nextMonthIncome,
+  budget, budgetIsSet, spent, nextMonthIncome, priorMonthLabel,
 }: {
-  budget: number; budgetIsSet: boolean; allocated: number; spent: number; nextMonthIncome: number;
+  budget: number; budgetIsSet: boolean; spent: number; nextMonthIncome: number; priorMonthLabel: string;
 }) {
-  const remainingToAllocate = budget - allocated;
-  const remainingToSpend = budget - spent;
-  const overAllocated = remainingToAllocate < -0.005;
+  const remaining = budget - spent;
+  const overspent = remaining < -0.005;
   return (
     <div className="glass-panel rounded-2xl border border-primary/40 p-5">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Current Budget</p>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Starting Budget</p>
       <p className="mt-2 font-mono text-2xl font-bold">{fmt(budget)}</p>
-      {!budgetIsSet && (
+      {budgetIsSet ? (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          Based on {priorMonthLabel} income after month closing.
+        </p>
+      ) : (
         <p className="mt-1 text-[10px] text-warning">
           Not set — close prior month to establish this month's budget.
         </p>
       )}
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <span className="text-muted-foreground">Allocated this month</span>
-        <span className="text-right font-mono">{fmt(allocated)}</span>
         <span className="text-muted-foreground">Spent this month</span>
         <span className="text-right font-mono">{fmt(spent)}</span>
-        <span className={overAllocated ? "text-warning" : "text-muted-foreground"}>Remaining to allocate</span>
-        <span className={`text-right font-mono ${overAllocated ? "text-warning" : ""}`}>{fmt(remainingToAllocate)}</span>
-        <span className={remainingToSpend < 0 ? "text-warning" : "text-muted-foreground"}>Remaining to spend</span>
-        <span className={`text-right font-mono ${remainingToSpend < 0 ? "text-warning" : ""}`}>{fmt(remainingToSpend)}</span>
+        <span className={overspent ? "text-warning" : "text-muted-foreground"}>Remaining budget</span>
+        <span className={`text-right font-mono ${overspent ? "text-warning" : ""}`}>{fmt(remaining)}</span>
       </div>
-      {overAllocated && (
+      {overspent && (
         <p className="mt-2 text-[11px] text-warning">
-          ⚠ Monthly plan is overallocated by {fmt(Math.abs(remainingToAllocate))}.
+          ⚠ Over budget by {fmt(Math.abs(remaining))}.
         </p>
       )}
       <div className="mt-3 border-t border-white/10 pt-2 text-xs">
@@ -530,8 +557,7 @@ function MonthlyBudgetCard({
           <span className="text-right font-mono text-primary">{fmt(nextMonthIncome)}</span>
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Only spending-category allocations reduce "Remaining to allocate". Cumulative
-          balances stay separate.
+          Income earned this month becomes next month's budget after closing.
         </p>
       </div>
     </div>
@@ -540,16 +566,21 @@ function MonthlyBudgetCard({
 
 
 function BudgetRow({
-  cat, txns, contribution, balance, onEdit,
+  cat, txns, contribution, balance, summarySpent, summaryAllocation, onEdit,
 }: {
   cat: BudgetCategory;
   txns: Transaction[];
   contribution: number;
   balance: number;
+  summarySpent?: number;
+  summaryAllocation?: number;
   onEdit: () => void;
 }) {
-  const spent = budgetSpent(cat, txns);
-  const limit = Number(cat.monthly_limit);
+  const liveSpent = budgetSpent(cat, txns);
+  const spent = (summarySpent && summarySpent > 0) ? summarySpent : liveSpent;
+  const limit = (summaryAllocation && summaryAllocation > 0)
+    ? summaryAllocation
+    : Number(cat.monthly_limit);
   const goal = cat.goal_amount ? Number(cat.goal_amount) : null;
   const label = CATEGORY_LABELS[cat.code] ?? { long: cat.name, short: cat.code };
   const accent = (cat.color && cat.color.startsWith("#")) ? cat.color : (SERIES_COLOR[cat.code] ?? "hsl(var(--primary))");
@@ -576,6 +607,7 @@ function BudgetRow({
   const pct = barMax > 0 ? Math.min(100, (barValue / barMax) * 100) : 0;
   const overspent = isSpending && limit > 0 && spent > limit;
   const goalPct = goal && goal > 0 ? Math.min(100, (balance / goal) * 100) : null;
+
 
   return (
     <button
