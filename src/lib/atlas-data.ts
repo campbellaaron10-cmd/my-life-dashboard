@@ -362,6 +362,159 @@ export function useApplyFunRollover() {
   });
 }
 
+/**
+ * Compute a plan for closing the "current" open month.
+ *
+ * Excel workbook rule: next month's Budget = this month's Income − this month's Housing.
+ * Fun leftover splits per finance_settings percentages (default 70/25/5) into
+ * Vacation / Short-Term Savings / next month's Fun rollover.
+ *
+ * `targetMonth` is the month to close (YYYY-MM-01). Defaults to the previous calendar month.
+ * Returns a plan the UI can preview; no writes happen here.
+ */
+export type CloseMonthPlan = {
+  closingMonth: string;      // e.g. "2026-06-01"
+  nextMonth: string;         // e.g. "2026-07-01"
+  income: number;
+  housing: number;
+  nextBudget: number;
+  funBudget: number;
+  funSpent: number;
+  funLeftover: number;
+  toVac: number;
+  toSts: number;
+  toFunNext: number;
+  rules: { vac: number; sts: number; fun: number };
+  categorySpent: Record<string, number>; // code → spent for the closing month
+};
+
+export function useCloseMonthPlan(targetMonth?: string) {
+  return useQuery({
+    queryKey: ["close_month_plan", targetMonth ?? "prev"] as const,
+    queryFn: async (): Promise<CloseMonthPlan> => {
+      const user_id = await currentUserId();
+      const now = new Date();
+      const defaultTarget = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const target = targetMonth ? new Date(targetMonth) : defaultTarget;
+      const start = new Date(target.getFullYear(), target.getMonth(), 1);
+      const end = new Date(target.getFullYear(), target.getMonth() + 1, 1);
+      const closingMonth = start.toISOString().slice(0, 10);
+      const nextMonth = end.toISOString().slice(0, 10);
+
+      const [cats, sets, txns] = await Promise.all([
+        supabase.from("budget_categories").select("*").eq("user_id", user_id),
+        supabase.from("finance_settings").select("*").eq("user_id", user_id).maybeSingle(),
+        supabase.from("transactions").select("*").eq("user_id", user_id).gte("occurred_on", closingMonth).lt("occurred_on", nextMonth),
+      ]);
+      const categories = (cats.data ?? []) as BudgetCategory[];
+      const settings = (sets.data ?? null) as FinanceSettings | null;
+      const rules = {
+        vac: Number(settings?.fun_to_vacation_pct ?? 70),
+        sts: Number(settings?.fun_to_sts_pct ?? 25),
+        fun: Number(settings?.fun_to_fun_pct ?? 5),
+      };
+
+      const txnRows = (txns.data ?? []) as Transaction[];
+      const income = txnRows.filter((t) => t.type === "income").reduce((s, t) => s + Number(t.amount), 0);
+      const spentByCat: Record<string, number> = {};
+      const categorySpent: Record<string, number> = {};
+      for (const c of categories) categorySpent[c.code] = 0;
+      for (const t of txnRows) {
+        if (t.type !== "expense" || !t.category_id) continue;
+        spentByCat[t.category_id] = (spentByCat[t.category_id] ?? 0) + Number(t.amount);
+        const c = categories.find((c) => c.id === t.category_id);
+        if (c) categorySpent[c.code] = (categorySpent[c.code] ?? 0) + Number(t.amount);
+      }
+
+      const hou = categories.find((c) => c.code === "HOU");
+      const fun = categories.find((c) => c.code === "FUN");
+      const housing = hou ? (spentByCat[hou.id] ?? 0) : (categorySpent.HOU ?? 0);
+      const funBudget = fun ? Number(fun.monthly_limit) + Number(fun.rollover_balance) : 0;
+      const funSpent = fun ? (spentByCat[fun.id] ?? 0) : (categorySpent.FUN ?? 0);
+      const funLeftover = Math.max(0, funBudget - funSpent);
+      const nextBudget = Math.max(0, income - housing);
+
+      return {
+        closingMonth, nextMonth,
+        income, housing, nextBudget,
+        funBudget, funSpent, funLeftover,
+        toVac: (funLeftover * rules.vac) / 100,
+        toSts: (funLeftover * rules.sts) / 100,
+        toFunNext: (funLeftover * rules.fun) / 100,
+        rules,
+        categorySpent,
+      };
+    },
+  });
+}
+
+/**
+ * Full month-close workflow. Snapshots the closing month, applies the Fun-money
+ * rollover, writes the next month's budget row, and stamps last_month_closed.
+ */
+export function useCloseMonth() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (plan: CloseMonthPlan) => {
+      const user_id = await currentUserId();
+      const [cats, existing] = await Promise.all([
+        supabase.from("budget_categories").select("*").eq("user_id", user_id),
+        supabase.from("monthly_summaries").select("*").eq("user_id", user_id).in("month", [plan.closingMonth, plan.nextMonth]),
+      ]);
+      const categories = (cats.data ?? []) as BudgetCategory[];
+      const closingRow = (existing.data ?? []).find((r: any) => r.month === plan.closingMonth) as MonthlySummary | undefined;
+      const nextRow = (existing.data ?? []).find((r: any) => r.month === plan.nextMonth) as MonthlySummary | undefined;
+
+      const fun = categories.find((c) => c.code === "FUN");
+      const vac = categories.find((c) => c.code === "VAC");
+      const sts = categories.find((c) => c.code === "STS");
+
+      // 1) Snapshot closing month.
+      const closingPayload: any = {
+        ...(closingRow ?? {}),
+        user_id,
+        month: plan.closingMonth,
+        income: plan.income,
+        housing: plan.housing,
+        budget: closingRow?.budget ?? 0,
+        ess_spent: plan.categorySpent.ESS ?? 0,
+        fun_allocated: fun ? Number(fun.monthly_limit) : 0,
+        fun_spent: plan.funSpent,
+        source: "close_month",
+      };
+      await supabase.from("monthly_summaries").upsert(closingPayload, { onConflict: "user_id,month" });
+
+      // 2) Apply rollovers on categories.
+      if (fun) await supabase.from("budget_categories").update({ rollover_balance: plan.toFunNext }).eq("id", fun.id);
+      if (vac) await supabase.from("budget_categories").update({ rollover_balance: Number(vac.rollover_balance) + plan.toVac }).eq("id", vac.id);
+      if (sts) await supabase.from("budget_categories").update({ rollover_balance: Number(sts.rollover_balance) + plan.toSts }).eq("id", sts.id);
+
+      // 3) Open the next month with the computed budget.
+      const nextPayload: any = {
+        ...(nextRow ?? {}),
+        user_id,
+        month: plan.nextMonth,
+        budget: plan.nextBudget,
+        source: "close_month",
+      };
+      await supabase.from("monthly_summaries").upsert(nextPayload, { onConflict: "user_id,month" });
+
+      // 4) Stamp the settings row so we know this month is closed.
+      await supabase.from("finance_settings").upsert({ user_id, last_month_closed: plan.closingMonth });
+
+      return plan;
+    },
+    onSuccess: (plan) => {
+      qc.invalidateQueries({ queryKey: qk.budgets });
+      qc.invalidateQueries({ queryKey: qk.financeSettings });
+      qc.invalidateQueries({ queryKey: qk.monthlySummaries });
+      qc.invalidateQueries({ queryKey: ["close_month_plan"] });
+      toast.success(`Closed ${plan.closingMonth.slice(0, 7)} · next budget ${plan.nextBudget.toFixed(0)}`);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 // ---------- Monthly summaries (Excel workbook rows → DB) ----------
 export function useMonthlySummaries() {
   return useQuery({
