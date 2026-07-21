@@ -424,6 +424,12 @@ function FinancesDashboard() {
       <BudgetDialog open={budgetDialog !== null} initial={budgetDialog} onClose={() => setBudgetDialog(null)} />
       <AccountDialog open={accountDialog !== null} initial={accountDialog} onClose={() => setAccountDialog(null)} />
       <MonthDialog open={monthDialog !== null} initial={monthDialog} onClose={() => setMonthDialog(null)} />
+      <MonthReportDialog
+        summary={monthReport}
+        onClose={() => setMonthReport(null)}
+        onEdit={(s) => { setMonthReport(null); setMonthDialog(s); }}
+      />
+      <CloseMonthDialog open={closeMonthOpen} onClose={() => setCloseMonthOpen(false)} />
       <SettingsDialog open={settingsOpen} settingsRow={settings.data ?? null} onClose={() => setSettingsOpen(false)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
