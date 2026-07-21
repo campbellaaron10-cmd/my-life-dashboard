@@ -182,6 +182,7 @@ export const DEFAULT_CATEGORIES = [
   { code: "VAC", name: "Vacation Fund", kind: "savings", sort_order: 4, rollover: true },
   { code: "LTS", name: "Long-Term Savings", kind: "investment", sort_order: 5, rollover: true },
   { code: "FED", name: "Fidelity Investments", kind: "investment", sort_order: 6, rollover: true },
+  { code: "RSU", name: "Restricted Stock Units", kind: "investment", sort_order: 7, rollover: true },
 ] as const;
 
 export type MonthlySummary = Tables["monthly_summaries"]["Row"];
