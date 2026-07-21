@@ -493,13 +493,18 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
   const goal = cat.goal_amount ? Number(cat.goal_amount) : null;
   const goalPct = goal && goal > 0 ? Math.min(100, (roll / goal) * 100) : null;
   const label = CATEGORY_LABELS[cat.code] ?? { long: cat.name, short: cat.code };
-  const bar = pct >= 100 ? "bg-warning" : isSaving ? "bg-accent" : "bg-primary";
+  const accent = (cat.color && cat.color.startsWith("#")) ? cat.color : (SERIES_COLOR[cat.code] ?? "hsl(var(--primary))");
+  const overspent = pct >= 100 && !isSaving;
 
   return (
-    <button onClick={onEdit} className="rounded-2xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:bg-white/10">
+    <button
+      onClick={onEdit}
+      className="rounded-2xl border border-white/5 bg-white/5 p-4 text-left transition-all hover:bg-white/10"
+      style={{ boxShadow: `inset 3px 0 0 ${accent}` }}
+    >
       <div className="mb-2 flex items-baseline justify-between">
         <div>
-          <p className="text-base font-semibold">
+          <p className="text-base font-semibold" style={{ color: accent }}>
             {label.long} <span className="ml-1 font-mono text-[10px] uppercase text-muted-foreground">{label.short}</span>
           </p>
           <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
@@ -510,8 +515,11 @@ function BudgetRow({ cat, txns, onEdit }: { cat: BudgetCategory; txns: Transacti
           {isSaving ? `${fmt(spent)} contributed` : `${fmt(spent)} / ${fmt(available)}`}
         </p>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-white/5">
-        <div className={`h-full transition-all ${bar}`} style={{ width: `${pct}%` }} />
+      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: overspent ? "hsl(var(--warning))" : accent }}
+        />
       </div>
       <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
         <span>Budgeted {fmt(limit)}{roll ? ` · carryover ${fmt(roll)}` : ""}</span>
