@@ -96,8 +96,12 @@ export function useWeather(location: LocationCoords) {
       const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
       if (!res.ok) throw new Error("Weather service unavailable");
       const j = await res.json();
-      const nowIso = new Date().toISOString().slice(0, 13);
-      const startIdx = Math.max(0, j.hourly.time.findIndex((t: string) => t.slice(0, 13) >= nowIso));
+      // Open-Meteo returns local times (timezone=auto) with no offset,
+      // so compare against a local-hour ISO string, not UTC.
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const nowLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}`;
+      const startIdx = Math.max(0, j.hourly.time.findIndex((t: string) => t.slice(0, 13) >= nowLocal));
       const hourly: WeatherHourly[] = j.hourly.time.slice(startIdx, startIdx + 24).map((t: string, i: number) => ({
         time: t,
         temp: j.hourly.temperature_2m[startIdx + i],
