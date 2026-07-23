@@ -271,36 +271,7 @@ function Dashboard() {
           </GlassCard>
         </PrivacyGuard>
 
-        {/* Weather */}
-        <Link to="/weather" className="col-span-12 lg:col-span-4">
-          <GlassCard className="h-full transition-all hover:scale-[1.01]">
-            <p className="mb-4 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Forecast</p>
-            {weather.data ? (
-              <>
-                <div className="flex items-center gap-4">
-                  {weatherIcon(weather.data.now.code, "size-16")}
-                  <div>
-                    <p className="text-5xl font-light">{Math.round(weather.data.now.temperature)}°</p>
-                    <p className="text-sm text-muted-foreground">{weatherCondition(weather.data.now.code).label}</p>
-                  </div>
-                </div>
-                <div className="mt-6 flex gap-2 overflow-x-auto">
-                  {weather.data.hourly.slice(0, 6).map((h) => (
-                    <div key={h.time} className="flex flex-col items-center rounded-xl bg-white/5 px-3 py-2">
-                      <span className="font-mono text-[10px] text-muted-foreground">{new Date(h.time).toLocaleTimeString("en-US", { hour: "numeric" })}</span>
-                      <div className="my-1 size-4 text-primary">{weatherIcon(h.code, "size-4")}</div>
-                      <span className="font-mono text-sm">{Math.round(h.temp)}°</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="text-muted-foreground">Loading weather…</p>
-            )}
-          </GlassCard>
-        </Link>
-
-        {/* Tasks */}
+        {/* Tasks — promoted next to Financial Core; will grow as Tasks matures. */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-4">
           <div className="mb-6 flex items-center justify-between border-b border-white/5 pb-4">
             <h2 className="text-xl font-semibold">Today's Focus</h2>
@@ -331,6 +302,35 @@ function Dashboard() {
             </ul>
           )}
         </GlassCard>
+
+        {/* Weather — compact forecast preview. */}
+        <Link to="/weather" className="col-span-12 md:col-span-6 lg:col-span-4">
+          <GlassCard className="h-full transition-all hover:scale-[1.01]">
+            <p className="mb-4 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Forecast</p>
+            {weather.data ? (
+              <>
+                <div className="flex items-center gap-4">
+                  {weatherIcon(weather.data.now.code, "size-16")}
+                  <div>
+                    <p className="text-5xl font-light">{Math.round(weather.data.now.temperature)}°</p>
+                    <p className="text-sm text-muted-foreground">{weatherCondition(weather.data.now.code).label}</p>
+                  </div>
+                </div>
+                <div className="mt-6 flex gap-2 overflow-x-auto">
+                  {weather.data.hourly.slice(0, 6).map((h) => (
+                    <div key={h.time} className="flex flex-col items-center rounded-xl bg-white/5 px-3 py-2">
+                      <span className="font-mono text-[10px] text-muted-foreground">{new Date(h.time).toLocaleTimeString("en-US", { hour: "numeric" })}</span>
+                      <div className="my-1 size-4 text-primary">{weatherIcon(h.code, "size-4")}</div>
+                      <span className="font-mono text-sm">{Math.round(h.temp)}°</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-muted-foreground">Loading weather…</p>
+            )}
+          </GlassCard>
+        </Link>
 
         {/* Pantry */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-5">
