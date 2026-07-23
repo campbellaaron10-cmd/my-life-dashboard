@@ -100,10 +100,12 @@ function Dashboard() {
 
     if (mode === "private") {
       // Budget pace: only for categories with a valid allocation > 0, after day 3.
+      // Budget pace: only spending categories with an explicit allocation > 0.
+      // HOU is excluded — it has no fixed allocation (budget = income − housing).
       if (dayOfMonth > 3) {
-        for (const code of ["HOU", "ESS", "FUN"] as const) {
+        for (const code of ["ESS", "FUN"] as const) {
           const alloc = finance.allocByCode[code] ?? 0;
-          if (alloc <= 0) continue; // no configured allocation → skip silently
+          if (alloc <= 0) continue;
           const spent = finance.spentByCode[code] ?? 0;
           const spentPct = spent / alloc;
           if (spentPct >= 0.95) {
