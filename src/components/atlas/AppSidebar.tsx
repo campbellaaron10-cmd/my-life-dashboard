@@ -8,7 +8,6 @@ import {
   CloudSun,
   Shield,
   Users,
-  Monitor,
   LogOut,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,7 +24,6 @@ const items = [
 const modeMeta: Record<PrivacyMode, { label: string; icon: typeof Shield; hint: string }> = {
   private: { label: "Private", icon: Shield, hint: "All data visible" },
   guest: { label: "Guest", icon: Users, hint: "Finance hidden" },
-  wall: { label: "Wall", icon: Monitor, hint: "Ambient display" },
 };
 
 export function AppSidebar() {
