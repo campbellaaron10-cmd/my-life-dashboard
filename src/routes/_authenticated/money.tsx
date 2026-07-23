@@ -587,13 +587,18 @@ function BudgetRow({
 
   const isSpending = cat.kind === "spending";
   const isSavings = cat.kind === "savings";
+  // Housing & Utilities has no fixed allocation — budget for next month is
+  // derived from (income − housing). Show spend only, no bar/remaining/%.
+  const isHousing = cat.code === "HOU";
 
   // Spending: bar tracks spent vs monthly allocation.
   // Savings/investment: bar tracks actual contribution vs planned contribution (or goal for savings).
   let barValue = 0;
   let barMax = 0;
   let headline = "";
-  if (isSpending) {
+  if (isHousing) {
+    headline = `${fmt(spent)} spent`;
+  } else if (isSpending) {
     barValue = spent;
     barMax = limit;
     headline = `${fmt(spent)} / ${fmt(limit)}`;
@@ -605,7 +610,7 @@ function BudgetRow({
       : `${fmt(contribution)} contributed`;
   }
   const pct = barMax > 0 ? Math.min(100, (barValue / barMax) * 100) : 0;
-  const overspent = isSpending && limit > 0 && spent > limit;
+  const overspent = isSpending && !isHousing && limit > 0 && spent > limit;
   const goalPct = goal && goal > 0 ? Math.min(100, (balance / goal) * 100) : null;
 
 
@@ -621,19 +626,25 @@ function BudgetRow({
             {label.long} <span className="ml-1 font-mono text-[10px] uppercase text-muted-foreground">{label.short}</span>
           </p>
           <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
-            {cat.kind}{cat.rollover ? " · rolls over" : ""}
+            {isHousing ? "flows into next month's budget" : `${cat.kind}${cat.rollover ? " · rolls over" : ""}`}
           </p>
         </div>
         <p className="font-mono text-sm">{headline}</p>
       </div>
-      <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-        <div
-          className="h-full transition-all"
-          style={{ width: `${pct}%`, backgroundColor: overspent ? "hsl(var(--warning))" : accent }}
-        />
-      </div>
+      {!isHousing && (
+        <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full transition-all"
+            style={{ width: `${pct}%`, backgroundColor: overspent ? "hsl(var(--warning))" : accent }}
+          />
+        </div>
+      )}
 
-      {isSpending ? (
+      {isHousing ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          No fixed allocation. Next month's budget = this month's income − housing.
+        </p>
+      ) : isSpending ? (
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
           <span>Monthly allocation {fmt(limit)}</span>
           <span className={limit - spent < 0 ? "text-warning" : ""}>Remaining {fmt(limit - spent)}</span>

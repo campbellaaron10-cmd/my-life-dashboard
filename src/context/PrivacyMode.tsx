@@ -8,15 +8,14 @@ import {
   type ReactNode,
 } from "react";
 
-export type PrivacyMode = "private" | "guest" | "wall";
+export type PrivacyMode = "private" | "guest";
 
 /**
  * Widget-level visibility policy.
  *  - "private-only": only visible in Private mode (finance detail, activity feed…)
  *  - "guest-safe":   visible in every mode (tasks, weather, pantry, calendar…)
- *  - "wall-only":    reserved for future wall-display large-format widgets
  */
-export type Sensitivity = "private-only" | "guest-safe" | "wall-only";
+export type Sensitivity = "private-only" | "guest-safe";
 
 interface PrivacyContextValue {
   mode: PrivacyMode;
@@ -31,11 +30,14 @@ const STORAGE_KEY = "atlas.privacyMode";
 export function PrivacyModeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<PrivacyMode>("private");
 
-  // Hydrate from localStorage after mount (avoids SSR mismatch — provider is client-only anyway).
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === "private" || saved === "guest" || saved === "wall") {
+    if (saved === "private" || saved === "guest") {
       setModeState(saved);
+    } else if (saved === "wall") {
+      // Legacy: Wall mode has been removed — fall back to Guest.
+      setModeState("guest");
+      localStorage.setItem(STORAGE_KEY, "guest");
     }
   }, []);
 
@@ -46,7 +48,7 @@ export function PrivacyModeProvider({ children }: { children: ReactNode }) {
 
   const cycle = useCallback(() => {
     setModeState((prev) => {
-      const next: PrivacyMode = prev === "private" ? "guest" : prev === "guest" ? "wall" : "private";
+      const next: PrivacyMode = prev === "private" ? "guest" : "private";
       localStorage.setItem(STORAGE_KEY, next);
       return next;
     });
@@ -56,7 +58,6 @@ export function PrivacyModeProvider({ children }: { children: ReactNode }) {
     (s: Sensitivity) => {
       if (s === "guest-safe") return true;
       if (s === "private-only") return mode === "private";
-      if (s === "wall-only") return mode === "wall";
       return true;
     },
     [mode],
@@ -73,10 +74,6 @@ export function usePrivacyMode() {
   return ctx;
 }
 
-/**
- * Gate a widget by sensitivity. When hidden, an optional `fallback` renders
- * a guest-safe replacement so the dashboard grid never has empty cells.
- */
 export function PrivacyGuard({
   sensitivity,
   fallback,
