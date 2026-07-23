@@ -210,7 +210,7 @@ function Dashboard() {
             <GlassCard className="col-span-12 lg:col-span-8">
               <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
                 <Wallet className="size-8 opacity-40" />
-                <p>Finance hidden in {mode === "guest" ? "Guest" : "Wall"} mode.</p>
+                <p>Finance hidden in Guest mode.</p>
               </div>
             </GlassCard>
           }
@@ -242,25 +242,31 @@ function Dashboard() {
               />
             </div>
 
-            {/* Secondary: compact balance chips */}
+            {/* Secondary: compact balance chips. RSU lives in the Finances module. */}
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <BalanceChip
+                label="Fun Remaining"
+                sub="FUN"
+                value={fmt(Math.max(0, (finance.allocByCode.FUN ?? 0) - (finance.spentByCode.FUN ?? 0)))}
+                color={SERIES_COLOR.FUN}
+              />
               <BalanceChip label="Vacation" sub="VAC" value={fmt(finance.balanceByCode.VAC)} color={SERIES_COLOR.VAC} />
               <BalanceChip label="Short-Term" sub="STS" value={fmt(finance.balanceByCode.STS)} color={SERIES_COLOR.STS} />
               <BalanceChip label="Fidelity" sub="FED" value={fmt(finance.balanceByCode.FED)} color={SERIES_COLOR.FED} />
               <BalanceChip label="Long-Term" sub="LTS" value={fmt(finance.balanceByCode.LTS)} color={SERIES_COLOR.LTS} />
-              <BalanceChip label="RSU" sub="RSU" value={fmt(finance.balanceByCode.RSU)} color={SERIES_COLOR.RSU} />
               <BalanceChip label="Regions" sub="CHK" value={fmt(finance.balanceByCode.Regions)} color={SERIES_COLOR.Regions} />
             </div>
 
-            {/* Compact embedded chart */}
+            {/* Compact embedded chart — last 6 months only (trend preview). */}
             <Link to="/money" className="mt-4 block rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10">
               <div className="mb-1 flex items-center justify-between">
                 <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
                   <LineChartIcon className="size-3" /> Investment & Savings Growth
+                  <span className="ml-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">6mo</span>
                 </p>
-                <span className="text-[10px] text-primary">Open chart →</span>
+                <span className="text-[10px] text-primary">Open full chart →</span>
               </div>
-              <FinanceMiniChart summaries={finance.summaries} compact />
+              <FinanceMiniChart summaries={finance.summaries.slice(-6)} compact />
             </Link>
           </GlassCard>
         </PrivacyGuard>
