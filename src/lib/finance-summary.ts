@@ -81,7 +81,22 @@ export function useFinanceSummary(): FinanceSummary {
     const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     const curMonthKey = monthKey(monthStart);
 
-    const netWorth = allAccounts.reduce((s, a) => s + accountBalance(a, allTxns), 0);
+    // Net worth = sum of every account (checking, savings, brokerage, etc.)
+    // PLUS any monthly-summary balance code that has no matching account
+    // yet (so RSU / Fidelity / LTS / VAC / STS / Regions imported from Excel
+    // still count until a real account row is added for them).
+    const accountsTotal = allAccounts.reduce((s, a) => s + accountBalance(a, allTxns), 0);
+    const latest = allSummaries.at(-1);
+    const has = (re: RegExp, type?: Account["type"]) =>
+      allAccounts.some((a) => re.test(a.name) || (type ? a.type === type : false));
+    const summaryFallback =
+      (has(/regions/i, "checking") ? 0 : Number(latest?.regions_balance ?? 0)) +
+      (has(/fidelity|brokerage/i, "investment") ? 0 : Number(latest?.fed_balance ?? 0)) +
+      (has(/401|retirement/i, "retirement") ? 0 : Number(latest?.lts_balance ?? 0)) +
+      (has(/rsu|stock|equity/i) ? 0 : Number((latest as any)?.rsu_balance ?? 0)) +
+      (has(/vacation|\bvac\b/i) ? 0 : Number(latest?.vac_balance ?? 0)) +
+      (has(/short.?term|\bsts\b/i) ? 0 : Number(latest?.sts_balance ?? 0));
+    const netWorth = accountsTotal + summaryFallback;
 
     const currentSummary = allSummaries.find((s) => s.month === curMonthKey) ?? null;
     const latestSummary = allSummaries.at(-1) ?? null;

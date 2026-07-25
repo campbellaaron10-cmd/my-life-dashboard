@@ -22,18 +22,23 @@ export function FinanceMiniChart({
   summaries: MonthlySummary[];
   compact?: boolean;
 }) {
-  const rows = useMemo(
-    () =>
-      summaries.map((s) => ({
-        date: monthLabel(s.month),
-        FED: Number(s.fed_balance),
-        LTS: Number(s.lts_balance),
-        RSU: Number((s as any).rsu_balance ?? 0),
-        VAC: Number(s.vac_balance),
-        STS: Number(s.sts_balance),
-      })),
-    [summaries],
-  );
+  const rows = useMemo(() => {
+    // Forward-fill so recently-added balance columns (e.g. RSU) don't drop to
+    // zero for months that predate them.
+    const last: Record<string, number> = { FED: 0, LTS: 0, RSU: 0, VAC: 0, STS: 0 };
+    const pick = (k: keyof typeof last, v: number) => {
+      if (v && v !== 0) last[k] = v;
+      return last[k];
+    };
+    return summaries.map((s) => ({
+      date: monthLabel(s.month),
+      FED: pick("FED", Number(s.fed_balance)),
+      LTS: pick("LTS", Number(s.lts_balance)),
+      RSU: pick("RSU", Number((s as any).rsu_balance ?? 0)),
+      VAC: pick("VAC", Number(s.vac_balance)),
+      STS: pick("STS", Number(s.sts_balance)),
+    }));
+  }, [summaries]);
 
   const height = compact ? "h-24" : "h-40";
 

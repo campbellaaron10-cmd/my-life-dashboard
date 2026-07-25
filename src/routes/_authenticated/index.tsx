@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning,
   AlertTriangle, ArrowUpRight, Wallet, CheckSquare, Refrigerator, ShoppingBag,
@@ -11,7 +11,7 @@ import {
   usePantry, useTasks, daysUntil,
 } from "@/lib/atlas-data";
 import { useFinanceSummary, SERIES_COLOR, CATEGORY_LABELS } from "@/lib/finance-summary";
-import { useSavedLocation, useWeather, weatherCondition } from "@/hooks/useWeather";
+import { useSavedLocation, useWeather, weatherCondition, useSavedTimeZone } from "@/hooks/useWeather";
 import { PrivacyGuard, usePrivacyMode } from "@/context/PrivacyMode";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -69,7 +69,8 @@ function Dashboard() {
   const pantry = usePantry();
   const tasks = useTasks();
   const { location } = useSavedLocation();
-  const weather = useWeather(location);
+  const { timeZone } = useSavedTimeZone();
+  const weather = useWeather(location, timeZone);
   const { mode } = usePrivacyMode();
   const finance = useFinanceSummary();
 
@@ -303,10 +304,13 @@ function Dashboard() {
           )}
         </GlassCard>
 
-        {/* Weather — compact forecast preview. */}
+        {/* Weather — compact forecast preview with live clock. */}
         <Link to="/weather" className="col-span-12 md:col-span-6 lg:col-span-4">
           <GlassCard className="h-full transition-all hover:scale-[1.01]">
-            <p className="mb-4 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Forecast</p>
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Forecast</p>
+              <LiveClock timeZone={timeZone} />
+            </div>
             {weather.data ? (
               <>
                 <div className="flex items-center gap-4">
@@ -427,5 +431,21 @@ function BalanceChip({ label, sub, value, color }: { label: string; sub: string;
       </div>
       <p className="font-mono text-sm font-semibold tracking-tight">{value}</p>
     </div>
+  );
+}
+
+function LiveClock({ timeZone }: { timeZone: string }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const time = now.toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" });
+  const zoneAbbr = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" })
+    .formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "";
+  return (
+    <span className="font-mono text-sm tracking-tight tabular-nums">
+      {time} <span className="text-[10px] uppercase text-muted-foreground">{zoneAbbr}</span>
+    </span>
   );
 }

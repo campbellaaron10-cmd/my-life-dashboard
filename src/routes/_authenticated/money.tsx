@@ -134,10 +134,22 @@ function FinancesDashboard() {
 
   const rules: FinanceRules = { ...DEFAULT_RULES, ...((settings.data?.rules ?? {}) as Partial<FinanceRules>) };
 
-  const netWorth = useMemo(
-    () => allAccounts.reduce((s, a) => s + accountBalance(a, allTxns), 0),
-    [allAccounts, allTxns],
-  );
+  // Net worth = accounts + summary-balance fallbacks for codes that don't
+  // have a real account row yet (RSU, Fidelity, LTS, VAC, STS, Regions).
+  const netWorth = useMemo(() => {
+    const accountsTotal = allAccounts.reduce((s, a) => s + accountBalance(a, allTxns), 0);
+    const latest = allSummaries.at(-1);
+    const has = (re: RegExp, type?: Account["type"]) =>
+      allAccounts.some((a) => re.test(a.name) || (type ? a.type === type : false));
+    const fallback =
+      (has(/regions/i, "checking") ? 0 : Number(latest?.regions_balance ?? 0)) +
+      (has(/fidelity|brokerage/i, "investment") ? 0 : Number(latest?.fed_balance ?? 0)) +
+      (has(/401|retirement/i, "retirement") ? 0 : Number(latest?.lts_balance ?? 0)) +
+      (has(/rsu|stock|equity/i) ? 0 : Number((latest as any)?.rsu_balance ?? 0)) +
+      (has(/vacation|\bvac\b/i) ? 0 : Number(latest?.vac_balance ?? 0)) +
+      (has(/short.?term|\bsts\b/i) ? 0 : Number(latest?.sts_balance ?? 0));
+    return accountsTotal + fallback;
+  }, [allAccounts, allTxns, allSummaries]);
 
   // Current + previous month markers.
   const now = new Date();
@@ -709,15 +721,24 @@ function GrowthChart({ summaries, snapshots }: { summaries: MonthlySummary[]; sn
   const [mode, setMode] = useState<ChartMode>("balances");
 
   // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions.
-  const balanceRows = useMemo(() => summaries.map((s) => ({
-    date: monthLabel(s.month),
-    FED: Number(s.fed_balance),
-    LTS: Number(s.lts_balance),
-    RSU: Number((s as any).rsu_balance ?? 0),
-    VAC: Number(s.vac_balance),
-    STS: Number(s.sts_balance),
-    Regions: Number(s.regions_balance),
-  })), [summaries]);
+  // Forward-fill each series so a newly-tracked balance (e.g. RSU added mid-year)
+  // plots as a continuous line instead of dropping to $0 for months that predate it.
+  const balanceRows = useMemo(() => {
+    const last: Record<string, number> = { FED: 0, LTS: 0, RSU: 0, VAC: 0, STS: 0, Regions: 0 };
+    const pick = (key: string, raw: number) => {
+      if (raw && raw !== 0) last[key] = raw;
+      return last[key];
+    };
+    return summaries.map((s) => ({
+      date: monthLabel(s.month),
+      FED: pick("FED", Number(s.fed_balance)),
+      LTS: pick("LTS", Number(s.lts_balance)),
+      RSU: pick("RSU", Number((s as any).rsu_balance ?? 0)),
+      VAC: pick("VAC", Number(s.vac_balance)),
+      STS: pick("STS", Number(s.sts_balance)),
+      Regions: pick("Regions", Number(s.regions_balance)),
+    }));
+  }, [summaries]);
   const balanceSeries: (keyof typeof balanceRows[number])[] = ["FED", "LTS", "RSU", "VAC", "STS", "Regions"];
 
   // MONTHLY activity: allocated & spent per category, month by month.

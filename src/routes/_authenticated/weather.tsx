@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Sun, Cloud, CloudRain, CloudSnow, CloudLightning, Wind, Droplets, MapPin, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Sun, Cloud, CloudRain, CloudSnow, CloudLightning, Wind, Droplets, MapPin, Search, Clock } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useSavedLocation, useWeather, weatherCondition, geocodeCity, type LocationCoords } from "@/hooks/useWeather";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  useSavedLocation, useWeather, weatherCondition, geocodeCity,
+  useSavedTimeZone, TIME_ZONES, type LocationCoords,
+} from "@/hooks/useWeather";
 
 export const Route = createFileRoute("/_authenticated/weather")({
   head: () => ({ meta: [{ title: "Weather — Atlas" }] }),
@@ -23,7 +27,8 @@ function iconFor(code: number, isDay = true) {
 
 function WeatherPage() {
   const { location, save } = useSavedLocation();
-  const weather = useWeather(location);
+  const { timeZone, save: saveTz } = useSavedTimeZone();
+  const weather = useWeather(location, timeZone);
 
   return (
     <div className="space-y-8">
@@ -34,8 +39,22 @@ function WeatherPage() {
             <MapPin className="size-6 text-primary" />
             {location.label ?? `${location.lat.toFixed(2)}, ${location.lon.toFixed(2)}`}
           </h1>
+          <BigClock timeZone={timeZone} />
         </div>
-        <LocationPicker onPick={save} />
+        <div className="flex flex-col items-end gap-3">
+          <div className="flex items-center gap-2">
+            <Clock className="size-4 text-muted-foreground" />
+            <Select value={timeZone} onValueChange={saveTz}>
+              <SelectTrigger className="h-9 w-56"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {TIME_ZONES.map((z) => (
+                  <SelectItem key={z.value} value={z.value}>{z.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <LocationPicker onPick={save} />
+        </div>
       </header>
 
       {weather.isLoading ? (
@@ -166,5 +185,22 @@ function LocationPicker({ onPick }: { onPick: (l: LocationCoords) => void }) {
         </div>
       )}
     </div>
+  );
+}
+
+function BigClock({ timeZone }: { timeZone: string }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const time = now.toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit", second: "2-digit" });
+  const date = now.toLocaleDateString("en-US", { timeZone, weekday: "long", month: "short", day: "numeric" });
+  const abbr = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" })
+    .formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "";
+  return (
+    <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">
+      {date} · <span className="text-foreground">{time}</span> <span className="text-xs uppercase">{abbr}</span>
+    </p>
   );
 }
