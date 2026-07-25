@@ -433,3 +433,19 @@ function BalanceChip({ label, sub, value, color }: { label: string; sub: string;
     </div>
   );
 }
+
+function LiveClock({ timeZone }: { timeZone: string }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const time = now.toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit" });
+  const zoneAbbr = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" })
+    .formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "";
+  return (
+    <span className="font-mono text-sm tracking-tight tabular-nums">
+      {time} <span className="text-[10px] uppercase text-muted-foreground">{zoneAbbr}</span>
+    </span>
+  );
+}
