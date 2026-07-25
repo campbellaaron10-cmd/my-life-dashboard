@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Sun, Cloud, CloudRain, CloudSnow, CloudLightning,
   AlertTriangle, ArrowUpRight, Wallet, CheckSquare, Refrigerator, ShoppingBag,
@@ -11,7 +11,7 @@ import {
   usePantry, useTasks, daysUntil,
 } from "@/lib/atlas-data";
 import { useFinanceSummary, SERIES_COLOR, CATEGORY_LABELS } from "@/lib/finance-summary";
-import { useSavedLocation, useWeather, weatherCondition } from "@/hooks/useWeather";
+import { useSavedLocation, useWeather, weatherCondition, useSavedTimeZone } from "@/hooks/useWeather";
 import { PrivacyGuard, usePrivacyMode } from "@/context/PrivacyMode";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -69,7 +69,8 @@ function Dashboard() {
   const pantry = usePantry();
   const tasks = useTasks();
   const { location } = useSavedLocation();
-  const weather = useWeather(location);
+  const { timeZone } = useSavedTimeZone();
+  const weather = useWeather(location, timeZone);
   const { mode } = usePrivacyMode();
   const finance = useFinanceSummary();
 
