@@ -2,7 +2,37 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 const LOCATION_KEY = "atlas.weatherLocation";
+const TIMEZONE_KEY = "atlas.timeZone";
 const DEFAULT_LOCATION = { lat: 40.7128, lon: -74.006, label: "New York, NY" };
+export const DEFAULT_TIMEZONE = "America/New_York";
+
+// Common US zones + a few globals for the picker.
+export const TIME_ZONES: { value: string; label: string }[] = [
+  { value: "America/New_York", label: "Eastern (EST/EDT)" },
+  { value: "America/Chicago", label: "Central (CST/CDT)" },
+  { value: "America/Denver", label: "Mountain (MST/MDT)" },
+  { value: "America/Phoenix", label: "Arizona (MST, no DST)" },
+  { value: "America/Los_Angeles", label: "Pacific (PST/PDT)" },
+  { value: "America/Anchorage", label: "Alaska (AKST/AKDT)" },
+  { value: "Pacific/Honolulu", label: "Hawaii (HST)" },
+  { value: "UTC", label: "UTC" },
+  { value: "Europe/London", label: "London (GMT/BST)" },
+  { value: "Europe/Paris", label: "Central Europe (CET/CEST)" },
+  { value: "Asia/Tokyo", label: "Tokyo (JST)" },
+];
+
+export function useSavedTimeZone() {
+  const [tz, setTz] = useState<string>(DEFAULT_TIMEZONE);
+  useEffect(() => {
+    const saved = localStorage.getItem(TIMEZONE_KEY);
+    if (saved) setTz(saved);
+  }, []);
+  const save = (v: string) => {
+    localStorage.setItem(TIMEZONE_KEY, v);
+    setTz(v);
+  };
+  return { timeZone: tz, save };
+}
 
 export type LocationCoords = { lat: number; lon: number; label?: string };
 
@@ -78,9 +108,9 @@ export function useSavedLocation() {
   return { location, save };
 }
 
-export function useWeather(location: LocationCoords) {
+export function useWeather(location: LocationCoords, timeZone: string = DEFAULT_TIMEZONE) {
   return useQuery<WeatherBundle>({
-    queryKey: ["weather", location.lat, location.lon],
+    queryKey: ["weather", location.lat, location.lon, timeZone],
     queryFn: async () => {
       const params = new URLSearchParams({
         latitude: String(location.lat),
@@ -91,16 +121,20 @@ export function useWeather(location: LocationCoords) {
         temperature_unit: "fahrenheit",
         wind_speed_unit: "mph",
         forecast_days: "7",
-        timezone: "auto",
+        timezone: timeZone,
       });
       const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
       if (!res.ok) throw new Error("Weather service unavailable");
       const j = await res.json();
-      // Open-Meteo returns local times (timezone=auto) with no offset,
-      // so compare against a local-hour ISO string, not UTC.
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, "0");
-      const nowLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}`;
+      // Open-Meteo returns times in the requested timezone with no offset,
+      // so build a "now" string in that same zone for comparison.
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone,
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", hour12: false,
+      }).formatToParts(new Date());
+      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+      const nowLocal = `${get("year")}-${get("month")}-${get("day")}T${get("hour")}`;
       const startIdx = Math.max(0, j.hourly.time.findIndex((t: string) => t.slice(0, 13) >= nowLocal));
       const hourly: WeatherHourly[] = j.hourly.time.slice(startIdx, startIdx + 24).map((t: string, i: number) => ({
         time: t,
