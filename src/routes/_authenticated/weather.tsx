@@ -187,3 +187,20 @@ function LocationPicker({ onPick }: { onPick: (l: LocationCoords) => void }) {
     </div>
   );
 }
+
+function BigClock({ timeZone }: { timeZone: string }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  const time = now.toLocaleTimeString("en-US", { timeZone, hour: "numeric", minute: "2-digit", second: "2-digit" });
+  const date = now.toLocaleDateString("en-US", { timeZone, weekday: "long", month: "short", day: "numeric" });
+  const abbr = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "short" })
+    .formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "";
+  return (
+    <p className="mt-2 font-mono text-sm tabular-nums text-muted-foreground">
+      {date} · <span className="text-foreground">{time}</span> <span className="text-xs uppercase">{abbr}</span>
+    </p>
+  );
+}
