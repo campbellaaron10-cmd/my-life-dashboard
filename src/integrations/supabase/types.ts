@@ -478,6 +478,45 @@ export type Database = {
           },
         ]
       }
+      personal_dates: {
+        Row: {
+          color: string | null
+          created_at: string
+          id: string
+          is_recurring: boolean
+          kind: Database["public"]["Enums"]["personal_date_kind"]
+          name: string
+          notes: string | null
+          on_date: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_recurring?: boolean
+          kind?: Database["public"]["Enums"]["personal_date_kind"]
+          name: string
+          notes?: string | null
+          on_date: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_recurring?: boolean
+          kind?: Database["public"]["Enums"]["personal_date_kind"]
+          name?: string
+          notes?: string | null
+          on_date?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -920,6 +959,13 @@ export type Database = {
       activity_kind: "transaction" | "task" | "pantry" | "grocery" | "system"
       app_role: "owner" | "member" | "guest"
       nutrition_source: "usda" | "manual" | "barcode" | "imported"
+      personal_date_kind:
+        | "birthday"
+        | "anniversary"
+        | "holiday"
+        | "vacation"
+        | "countdown"
+        | "other"
       privacy_mode: "private" | "guest" | "wall"
       storage_location: "pantry" | "fridge" | "freezer" | "other"
       task_kind: "general" | "shopping"
@@ -1070,6 +1116,14 @@ export const Constants = {
       activity_kind: ["transaction", "task", "pantry", "grocery", "system"],
       app_role: ["owner", "member", "guest"],
       nutrition_source: ["usda", "manual", "barcode", "imported"],
+      personal_date_kind: [
+        "birthday",
+        "anniversary",
+        "holiday",
+        "vacation",
+        "countdown",
+        "other",
+      ],
       privacy_mode: ["private", "guest", "wall"],
       storage_location: ["pantry", "fridge", "freezer", "other"],
       task_kind: ["general", "shopping"],
