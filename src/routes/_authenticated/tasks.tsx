@@ -83,7 +83,7 @@ function TasksPage() {
         else if (t.is_done) return false;
 
         if (bucket === "shopping") { if (t.kind !== "shopping") return false; }
-        else if (t.kind === "shopping" && bucket !== "all") return false;
+        else if (t.kind === "shopping") return false;
 
         const d = daysUntil(t.due_on);
         if (bucket === "today" && d !== 0) return false;
