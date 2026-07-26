@@ -5,6 +5,7 @@ import {
   Wallet,
   Refrigerator,
   CheckSquare,
+  CalendarDays,
   CloudSun,
   Shield,
   Users,
@@ -18,6 +19,7 @@ const items = [
   { title: "Finances", to: "/money", icon: Wallet },
   { title: "Food", to: "/pantry", icon: Refrigerator },
   { title: "Tasks", to: "/tasks", icon: CheckSquare },
+  { title: "Calendar", to: "/calendar", icon: CalendarDays },
   { title: "Weather", to: "/weather", icon: CloudSun },
 ] as const;
 
