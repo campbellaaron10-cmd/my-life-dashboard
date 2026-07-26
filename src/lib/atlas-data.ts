@@ -48,6 +48,9 @@ export const qk = {
   projects: ["projects"] as const,
   personalDates: ["personal_dates"] as const,
   vault: ["vault_entries"] as const,
+  trips: ["trips"] as const,
+  tripItems: (tripId: string) => ["trip_items", tripId] as const,
+  tripExpenses: (tripId: string) => ["trip_expenses", tripId] as const,
 };
 
 async function currentUserId() {
