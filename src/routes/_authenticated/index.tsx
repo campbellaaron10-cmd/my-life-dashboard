@@ -9,6 +9,7 @@ import { GlassCard } from "@/components/atlas/GlassCard";
 import { FinanceMiniChart } from "@/components/atlas/FinanceMiniChart";
 import {
   usePantry, useTasks, daysUntil,
+  usePersonalDates, personalDateOccurrenceIn,
 } from "@/lib/atlas-data";
 import { useFinanceSummary, SERIES_COLOR, CATEGORY_LABELS } from "@/lib/finance-summary";
 import { useSavedLocation, useWeather, weatherCondition, useSavedTimeZone } from "@/hooks/useWeather";
@@ -68,6 +69,7 @@ function weatherIcon(code: number, cls = "size-8") {
 function Dashboard() {
   const pantry = usePantry();
   const tasks = useTasks();
+  const personalDates = usePersonalDates();
   const { location } = useSavedLocation();
   const { timeZone } = useSavedTimeZone();
   const weather = useWeather(location, timeZone);
@@ -156,8 +158,26 @@ function Dashboard() {
       }
     }
 
+    // Personal dates: birthdays/anniversaries/countdowns within 7 days
+    const now2 = new Date(); now2.setHours(0, 0, 0, 0);
+    const upcomingDates = (personalDates.data ?? [])
+      .map((pd) => {
+        const occ = pd.is_recurring ? personalDateOccurrenceIn(pd, now2.getFullYear()) : pd.on_date;
+        let d = daysUntil(occ);
+        // If recurring and already passed this year, roll to next year.
+        if (pd.is_recurring && d !== null && d < 0) d = daysUntil(personalDateOccurrenceIn(pd, now2.getFullYear() + 1));
+        return { pd, days: d };
+      })
+      .filter((x) => x.days !== null && x.days >= 0 && x.days <= 7)
+      .sort((a, b) => (a.days ?? 99) - (b.days ?? 99));
+    if (upcomingDates.length) {
+      const { pd, days } = upcomingDates[0];
+      const when = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
+      items.push({ text: `${pd.name} ${when}.`, tone: "info" });
+    }
+
     return items;
-  }, [finance, expiring, openTasks, weather.data, mode]);
+  }, [finance, expiring, openTasks, weather.data, mode, personalDates.data]);
 
   return (
     <div className="space-y-8">
