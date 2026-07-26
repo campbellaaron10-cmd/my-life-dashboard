@@ -44,6 +44,7 @@ export const qk = {
   monthlySummaries: ["monthly_summaries"] as const,
   projects: ["projects"] as const,
   personalDates: ["personal_dates"] as const,
+  vault: ["vault_entries"] as const,
 };
 
 async function currentUserId() {
