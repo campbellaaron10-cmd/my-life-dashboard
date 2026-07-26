@@ -19,6 +19,13 @@ export type Recipe = Tables["recipes"]["Row"];
 export type RecipeIngredient = Tables["recipe_ingredients"]["Row"];
 export type FinanceSettings = Tables["finance_settings"]["Row"];
 export type BalanceSnapshot = Tables["balance_snapshots"]["Row"];
+export type Project = Tables["projects"]["Row"];
+
+export type RecurrenceRule = {
+  every: number;
+  unit: "day" | "week" | "month" | "year" | "mile";
+  anchor?: "due" | "completed";
+};
 
 export const qk = {
   accounts: ["accounts"] as const,
@@ -33,6 +40,7 @@ export const qk = {
   financeSettings: ["finance_settings"] as const,
   balanceSnapshots: ["balance_snapshots"] as const,
   monthlySummaries: ["monthly_summaries"] as const,
+  projects: ["projects"] as const,
 };
 
 async function currentUserId() {
@@ -702,17 +710,44 @@ export function useTasks() {
   });
 }
 
+// Advance a date by a recurrence rule. Returns YYYY-MM-DD.
+export function advanceRecurrence(from: string | null, rule: RecurrenceRule): string | null {
+  if (!from || !rule || !rule.every || rule.unit === "mile") return null;
+  const d = new Date(from + "T00:00:00");
+  if (rule.unit === "day") d.setDate(d.getDate() + rule.every);
+  else if (rule.unit === "week") d.setDate(d.getDate() + rule.every * 7);
+  else if (rule.unit === "month") d.setMonth(d.getMonth() + rule.every);
+  else if (rule.unit === "year") d.setFullYear(d.getFullYear() + rule.every);
+  return d.toISOString().slice(0, 10);
+}
+
 export function useUpsertTask() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: Partial<Task> & { title: string }) => {
       const user_id = await currentUserId();
       const patch: any = { ...input, user_id };
-      if (patch.is_done && !patch.completed_at) patch.completed_at = new Date().toISOString();
+      const completing = patch.is_done === true;
+      if (completing && !patch.completed_at) patch.completed_at = new Date().toISOString();
       if (patch.is_done === false) patch.completed_at = null;
+
       const { data, error } = await supabase.from("tasks").upsert(patch).select().single();
       if (error) throw error;
-      return data as Task;
+      const saved = data as Task;
+
+      // Recurrence: on completion, spawn the next occurrence.
+      const rule = (saved.recurrence_rule ?? null) as RecurrenceRule | null;
+      if (completing && rule && rule.unit !== "mile" && rule.every > 0) {
+        const anchorDate = (rule.anchor === "completed"
+          ? new Date().toISOString().slice(0, 10)
+          : saved.due_on) ?? new Date().toISOString().slice(0, 10);
+        const next = advanceRecurrence(anchorDate, rule);
+        if (next) {
+          const { id, created_at, updated_at, completed_at, is_done, ...rest } = saved;
+          await supabase.from("tasks").insert({ ...rest, due_on: next, is_done: false, completed_at: null, user_id });
+        }
+      }
+      return saved;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.tasks }),
     onError: (e: Error) => toast.error(e.message),
@@ -729,6 +764,79 @@ export function useDeleteTask() {
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.tasks }),
     onError: (e: Error) => toast.error(e.message),
   });
+}
+
+// ---------- Projects ----------
+export function useProjects() {
+  return useQuery({
+    queryKey: qk.projects,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects").select("*").eq("is_archived", false)
+        .order("sort_order").order("created_at");
+      if (error) throw error;
+      return data as Project[];
+    },
+  });
+}
+
+export function useUpsertProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<Project> & { name: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase.from("projects").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as Project;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.projects }); toast.success("Project saved"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("projects").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.projects });
+      qc.invalidateQueries({ queryKey: qk.tasks });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Cross-module task source helper ----------
+/**
+ * Create-or-update a task originating from another module. Idempotent by
+ * (source_module, source_ref.id): re-invoking with the same id updates the
+ * existing task instead of creating duplicates.
+ */
+export async function upsertTaskFromSource(input: {
+  source_module: "pantry" | "recipes" | "finance" | "weather" | "calendar" | "trips" | "vault";
+  source_ref: { id: string; [k: string]: any };
+  template: Partial<Task> & { title: string };
+}): Promise<Task> {
+  const user_id = await currentUserId();
+  const { data: existing } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("source_module", input.source_module)
+    .eq("source_ref->>id", input.source_ref.id)
+    .maybeSingle();
+  const patch: any = {
+    ...(existing ?? {}),
+    ...input.template,
+    source_module: input.source_module,
+    source_ref: input.source_ref,
+    user_id,
+  };
+  const { data, error } = await supabase.from("tasks").upsert(patch).select().single();
+  if (error) throw error;
+  return data as Task;
 }
 
 // ---------- Derived ----------

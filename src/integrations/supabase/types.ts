@@ -502,6 +502,45 @@ export type Database = {
         }
         Relationships: []
       }
+      projects: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_archived: boolean
+          name: string
+          sort_order: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          name: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_archived?: boolean
+          name?: string
+          sort_order?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       raw_imports: {
         Row: {
           content_type: string | null
@@ -651,6 +690,7 @@ export type Database = {
       }
       tasks: {
         Row: {
+          category: string | null
           completed_at: string | null
           created_at: string
           due_on: string | null
@@ -658,18 +698,24 @@ export type Database = {
           id: string
           is_done: boolean
           kind: Database["public"]["Enums"]["task_kind"]
+          next_due_on: string | null
           notes: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           project: string | null
+          project_id: string | null
           quantity: number | null
           recurrence: string | null
+          recurrence_rule: Json | null
           sort_order: number
+          source_module: string | null
+          source_ref: Json | null
           title: string
           unit: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          category?: string | null
           completed_at?: string | null
           created_at?: string
           due_on?: string | null
@@ -677,18 +723,24 @@ export type Database = {
           id?: string
           is_done?: boolean
           kind?: Database["public"]["Enums"]["task_kind"]
+          next_due_on?: string | null
           notes?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project?: string | null
+          project_id?: string | null
           quantity?: number | null
           recurrence?: string | null
+          recurrence_rule?: Json | null
           sort_order?: number
+          source_module?: string | null
+          source_ref?: Json | null
           title: string
           unit?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          category?: string | null
           completed_at?: string | null
           created_at?: string
           due_on?: string | null
@@ -696,12 +748,17 @@ export type Database = {
           id?: string
           is_done?: boolean
           kind?: Database["public"]["Enums"]["task_kind"]
+          next_due_on?: string | null
           notes?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           project?: string | null
+          project_id?: string | null
           quantity?: number | null
           recurrence?: string | null
+          recurrence_rule?: Json | null
           sort_order?: number
+          source_module?: string | null
+          source_ref?: Json | null
           title?: string
           unit?: string | null
           updated_at?: string
@@ -713,6 +770,13 @@ export type Database = {
             columns: ["food_id"]
             isOneToOne: false
             referencedRelation: "foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
