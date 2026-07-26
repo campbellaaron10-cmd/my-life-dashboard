@@ -1381,3 +1381,157 @@ export function useDeleteVaultEntry() {
     onError: (e: Error) => toast.error(e.message),
   });
 }
+
+// ---------- Trips ----------
+export function useTrips() {
+  return useQuery({
+    queryKey: qk.trips,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trips").select("*").eq("is_archived", false)
+        .order("start_date", { ascending: true, nullsFirst: false })
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as Trip[];
+    },
+  });
+}
+
+export function useTrip(id: string | undefined) {
+  return useQuery({
+    queryKey: ["trip", id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("trips").select("*").eq("id", id!).maybeSingle();
+      if (error) throw error;
+      return data as Trip | null;
+    },
+  });
+}
+
+export function useUpsertTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<Trip> & { name: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("trips").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as Trip;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.trips });
+      toast.success("Trip saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteTrip() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("trips").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.trips });
+      toast.success("Trip deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useTripItems(tripId: string | undefined) {
+  return useQuery({
+    queryKey: tripId ? qk.tripItems(tripId) : ["trip_items", "none"],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_items").select("*").eq("trip_id", tripId!)
+        .order("on_date", { ascending: true, nullsFirst: true })
+        .order("starts_at", { ascending: true, nullsFirst: true })
+        .order("sort_order", { ascending: true });
+      if (error) throw error;
+      return data as TripItem[];
+    },
+  });
+}
+
+export function useUpsertTripItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<TripItem> & { trip_id: string; title: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("trip_items").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as TripItem;
+    },
+    onSuccess: (row) => {
+      qc.invalidateQueries({ queryKey: qk.tripItems(row.trip_id) });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteTripItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, trip_id }: { id: string; trip_id: string }) => {
+      const { error } = await supabase.from("trip_items").delete().eq("id", id);
+      if (error) throw error;
+      return trip_id;
+    },
+    onSuccess: (trip_id) => {
+      qc.invalidateQueries({ queryKey: qk.tripItems(trip_id) });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useTripExpenses(tripId: string | undefined) {
+  return useQuery({
+    queryKey: tripId ? qk.tripExpenses(tripId) : ["trip_expenses", "none"],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_expenses").select("*").eq("trip_id", tripId!)
+        .order("incurred_on", { ascending: false });
+      if (error) throw error;
+      return data as TripExpense[];
+    },
+  });
+}
+
+export function useUpsertTripExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<TripExpense> & { trip_id: string; description: string; amount: number }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("trip_expenses").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as TripExpense;
+    },
+    onSuccess: (row) => {
+      qc.invalidateQueries({ queryKey: qk.tripExpenses(row.trip_id) });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteTripExpense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, trip_id }: { id: string; trip_id: string }) => {
+      const { error } = await supabase.from("trip_expenses").delete().eq("id", id);
+      if (error) throw error;
+      return trip_id;
+    },
+    onSuccess: (trip_id) => {
+      qc.invalidateQueries({ queryKey: qk.tripExpenses(trip_id) });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
