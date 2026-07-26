@@ -1322,3 +1322,56 @@ export function describeUnitKind(u: string | null | undefined): string {
   return "unknown";
 }
 export { normalizeUnit };
+
+// ---------- Vault ----------
+export function useVaultEntries() {
+  return useQuery({
+    queryKey: qk.vault,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vault_entries").select("*").eq("is_archived", false)
+        .order("is_pinned", { ascending: false })
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data as VaultEntry[];
+    },
+  });
+}
+
+export function useUpsertVaultEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      input: Partial<VaultEntry> & { title: string; template: string },
+    ) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("vault_entries")
+        .upsert({ ...input, user_id })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as VaultEntry;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.vault });
+      toast.success("Saved to Vault");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteVaultEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("vault_entries").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.vault });
+      toast.success("Deleted");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
