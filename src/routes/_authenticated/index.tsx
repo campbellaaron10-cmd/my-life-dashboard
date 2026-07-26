@@ -307,22 +307,29 @@ function Dashboard() {
             <ul className="space-y-4">
               {todayTasks.map((t) => {
                 const d = daysUntil(t.due_on);
+                const prio = t.priority === "high" ? "bg-warning ring-warning/40"
+                           : t.priority === "low" ? "bg-slate-400 ring-slate-400/40"
+                           : "bg-primary ring-primary/40";
                 return (
-                  <li key={t.id} className="flex items-start gap-4">
-                    <div className={`mt-1 size-6 shrink-0 rounded-md border-2 ${t.priority === "high" ? "border-primary" : "border-white/20"}`} />
-                    <div className="min-w-0">
+                  <li key={t.id} className="flex items-start gap-3">
+                    <span className={`mt-2 size-2 shrink-0 rounded-full ring-2 ${prio}`} />
+                    <div className="min-w-0 flex-1">
                       <p className="text-lg font-medium leading-tight">{t.title}</p>
-                      {(t.priority === "high" || t.due_on) && (
-                        <p className="text-sm text-muted-foreground">
-                          {t.priority === "high" ? "High" : ""}
-                          {t.priority === "high" && t.due_on ? " · " : ""}
-                          {t.due_on ? (d === 0 ? "Today" : d! < 0 ? `${Math.abs(d!)}d overdue` : `${d}d`) : ""}
-                        </p>
-                      )}
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <SourceBadge source={t.source_module} />
+                        {(t.priority === "high" || t.due_on) && (
+                          <span className="font-mono text-[10px] uppercase text-muted-foreground">
+                            {t.priority === "high" ? "High" : ""}
+                            {t.priority === "high" && t.due_on ? " · " : ""}
+                            {t.due_on ? (d === 0 ? "Today" : d! < 0 ? `${Math.abs(d!)}d overdue` : `${d}d`) : ""}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </li>
                 );
               })}
+
             </ul>
           )}
         </GlassCard>
