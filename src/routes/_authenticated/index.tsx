@@ -332,8 +332,8 @@ function Dashboard() {
           <GlassCard className="h-full transition-all hover:scale-[1.01]">
             <div className="mb-3 flex items-center justify-between">
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground">Forecast</p>
-              <LiveClock timeZone={timeZone} />
             </div>
+
             {weather.data ? (
               <>
                 <div className="flex items-center gap-4">
