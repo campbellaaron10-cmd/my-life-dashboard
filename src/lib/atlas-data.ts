@@ -20,6 +20,7 @@ export type RecipeIngredient = Tables["recipe_ingredients"]["Row"];
 export type FinanceSettings = Tables["finance_settings"]["Row"];
 export type BalanceSnapshot = Tables["balance_snapshots"]["Row"];
 export type Project = Tables["projects"]["Row"];
+export type PersonalDate = Tables["personal_dates"]["Row"];
 
 export type RecurrenceRule = {
   every: number;
@@ -41,6 +42,7 @@ export const qk = {
   balanceSnapshots: ["balance_snapshots"] as const,
   monthlySummaries: ["monthly_summaries"] as const,
   projects: ["projects"] as const,
+  personalDates: ["personal_dates"] as const,
 };
 
 async function currentUserId() {
@@ -807,6 +809,54 @@ export function useDeleteProject() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+}
+
+// ---------- Personal Dates (Calendar) ----------
+export function usePersonalDates() {
+  return useQuery({
+    queryKey: qk.personalDates,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("personal_dates").select("*").order("on_date", { ascending: true });
+      if (error) throw error;
+      return data as PersonalDate[];
+    },
+  });
+}
+
+export function useUpsertPersonalDate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<PersonalDate> & { name: string; on_date: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("personal_dates").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as PersonalDate;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.personalDates }); toast.success("Date saved"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeletePersonalDate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("personal_dates").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: qk.personalDates }); toast.success("Date removed"); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// Compute the effective occurrence of a personal date within a given year
+// (handles recurring birthdays/anniversaries).
+export function personalDateOccurrenceIn(pd: PersonalDate, year: number): string {
+  if (!pd.is_recurring) return pd.on_date;
+  const [_, mm, dd] = pd.on_date.split("-");
+  return `${year}-${mm}-${dd}`;
 }
 
 // ---------- Cross-module task source helper ----------
