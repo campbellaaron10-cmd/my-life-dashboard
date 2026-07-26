@@ -877,6 +877,169 @@ export type Database = {
           },
         ]
       }
+      trip_expenses: {
+        Row: {
+          amount: number
+          category: string
+          created_at: string
+          description: string
+          id: string
+          incurred_on: string
+          notes: string | null
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description: string
+          id?: string
+          incurred_on?: string
+          notes?: string | null
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category?: string
+          created_at?: string
+          description?: string
+          id?: string
+          incurred_on?: string
+          notes?: string | null
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_expenses_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_items: {
+        Row: {
+          cost: number
+          created_at: string
+          ends_at: string | null
+          id: string
+          kind: Database["public"]["Enums"]["trip_item_kind"]
+          location: string | null
+          notes: string | null
+          on_date: string | null
+          sort_order: number
+          starts_at: string | null
+          title: string
+          trip_id: string
+          updated_at: string
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          cost?: number
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["trip_item_kind"]
+          location?: string | null
+          notes?: string | null
+          on_date?: string | null
+          sort_order?: number
+          starts_at?: string | null
+          title: string
+          trip_id: string
+          updated_at?: string
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["trip_item_kind"]
+          location?: string | null
+          notes?: string | null
+          on_date?: string | null
+          sort_order?: number
+          starts_at?: string | null
+          title?: string
+          trip_id?: string
+          updated_at?: string
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trips: {
+        Row: {
+          budget: number
+          color: string | null
+          cover_url: string | null
+          created_at: string
+          destination: string | null
+          end_date: string | null
+          id: string
+          is_archived: boolean
+          name: string
+          notes: string | null
+          related_project_id: string | null
+          start_date: string | null
+          status: Database["public"]["Enums"]["trip_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          budget?: number
+          color?: string | null
+          cover_url?: string | null
+          created_at?: string
+          destination?: string | null
+          end_date?: string | null
+          id?: string
+          is_archived?: boolean
+          name: string
+          notes?: string | null
+          related_project_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["trip_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          budget?: number
+          color?: string | null
+          cover_url?: string | null
+          created_at?: string
+          destination?: string | null
+          end_date?: string | null
+          id?: string
+          is_archived?: boolean
+          name?: string
+          notes?: string | null
+          related_project_id?: string | null
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["trip_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1024,6 +1187,13 @@ export type Database = {
       storage_location: "pantry" | "fridge" | "freezer" | "other"
       task_kind: "general" | "shopping"
       task_priority: "low" | "normal" | "high"
+      trip_item_kind: "lodging" | "travel" | "activity" | "food" | "note"
+      trip_status:
+        | "planning"
+        | "upcoming"
+        | "active"
+        | "completed"
+        | "cancelled"
       txn_type:
         | "expense"
         | "income"
@@ -1182,6 +1352,8 @@ export const Constants = {
       storage_location: ["pantry", "fridge", "freezer", "other"],
       task_kind: ["general", "shopping"],
       task_priority: ["low", "normal", "high"],
+      trip_item_kind: ["lodging", "travel", "activity", "food", "note"],
+      trip_status: ["planning", "upcoming", "active", "completed", "cancelled"],
       txn_type: [
         "expense",
         "income",
