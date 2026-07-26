@@ -22,6 +22,9 @@ export type BalanceSnapshot = Tables["balance_snapshots"]["Row"];
 export type Project = Tables["projects"]["Row"];
 export type PersonalDate = Tables["personal_dates"]["Row"];
 export type VaultEntry = Tables["vault_entries"]["Row"];
+export type Trip = Tables["trips"]["Row"];
+export type TripItem = Tables["trip_items"]["Row"];
+export type TripExpense = Tables["trip_expenses"]["Row"];
 
 export type RecurrenceRule = {
   every: number;
