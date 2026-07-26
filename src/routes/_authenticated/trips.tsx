@@ -266,7 +266,7 @@ function TripDetail({
           </div>
         </div>
 
-        <PrivacyGuard>
+        <PrivacyGuard sensitivity="private-only">
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             <MetricTile label="Budget"    value={fmtMoney(budget)} />
             <MetricTile label="Spent"     value={fmtMoney(spent)}  tone={spent > budget && budget > 0 ? "warn" : undefined} />
@@ -376,7 +376,7 @@ function TripDetail({
                               </span>
                             )}
                             {Number(item.cost) > 0 && (
-                              <PrivacyGuard><span>{fmtMoney(Number(item.cost))}</span></PrivacyGuard>
+                              <PrivacyGuard sensitivity="private-only"><span>{fmtMoney(Number(item.cost))}</span></PrivacyGuard>
                             )}
                           </div>
                           {item.notes && <div className="mt-1 text-xs text-muted-foreground">{item.notes}</div>}
@@ -426,7 +426,7 @@ function TripDetail({
               No expenses logged.
             </div>
           ) : (
-            <PrivacyGuard>
+            <PrivacyGuard sensitivity="private-only">
               <div className="divide-y divide-white/5">
                 {(expenses.data ?? []).map((e) => (
                   <div key={e.id} className="group flex items-center gap-3 py-3">
