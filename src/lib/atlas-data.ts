@@ -19,6 +19,13 @@ export type Recipe = Tables["recipes"]["Row"];
 export type RecipeIngredient = Tables["recipe_ingredients"]["Row"];
 export type FinanceSettings = Tables["finance_settings"]["Row"];
 export type BalanceSnapshot = Tables["balance_snapshots"]["Row"];
+export type Project = Tables["projects"]["Row"];
+
+export type RecurrenceRule = {
+  every: number;
+  unit: "day" | "week" | "month" | "year" | "mile";
+  anchor?: "due" | "completed";
+};
 
 export const qk = {
   accounts: ["accounts"] as const,
@@ -33,6 +40,7 @@ export const qk = {
   financeSettings: ["finance_settings"] as const,
   balanceSnapshots: ["balance_snapshots"] as const,
   monthlySummaries: ["monthly_summaries"] as const,
+  projects: ["projects"] as const,
 };
 
 async function currentUserId() {
