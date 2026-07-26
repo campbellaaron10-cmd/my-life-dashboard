@@ -934,6 +934,60 @@ export type Database = {
         }
         Relationships: []
       }
+      vault_entries: {
+        Row: {
+          created_at: string
+          fields: Json
+          id: string
+          is_archived: boolean
+          is_pinned: boolean
+          notes: string | null
+          related_project_id: string | null
+          related_task_ids: string[]
+          sort_order: number
+          subtitle: string | null
+          tags: string[]
+          template: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          fields?: Json
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          notes?: string | null
+          related_project_id?: string | null
+          related_task_ids?: string[]
+          sort_order?: number
+          subtitle?: string | null
+          tags?: string[]
+          template?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          fields?: Json
+          id?: string
+          is_archived?: boolean
+          is_pinned?: boolean
+          notes?: string | null
+          related_project_id?: string | null
+          related_task_ids?: string[]
+          sort_order?: number
+          subtitle?: string | null
+          tags?: string[]
+          template?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
