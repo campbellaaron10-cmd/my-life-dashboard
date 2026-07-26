@@ -23,6 +23,7 @@ const items = [
   { title: "Tasks", to: "/tasks", icon: CheckSquare },
   { title: "Calendar", to: "/calendar", icon: CalendarDays },
   { title: "Vault", to: "/vault", icon: BookLock },
+  { title: "Trips", to: "/trips", icon: Plane },
   { title: "Weather", to: "/weather", icon: CloudSun },
 ] as const;
 
