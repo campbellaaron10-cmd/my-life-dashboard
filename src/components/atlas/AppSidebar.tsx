@@ -7,6 +7,7 @@ import {
   CheckSquare,
   CalendarDays,
   BookLock,
+  Plane,
   CloudSun,
   Shield,
   Users,
