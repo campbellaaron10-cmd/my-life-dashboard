@@ -14,6 +14,7 @@ import {
 import { useFinanceSummary, SERIES_COLOR, CATEGORY_LABELS } from "@/lib/finance-summary";
 import { useSavedLocation, useWeather, weatherCondition, useSavedTimeZone } from "@/hooks/useWeather";
 import { PrivacyGuard, usePrivacyMode } from "@/context/PrivacyMode";
+import { SourceBadge } from "@/lib/task-sources";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
