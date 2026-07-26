@@ -422,7 +422,7 @@ function EntryDialog({
                 template: template.key,
                 title: title.trim(),
                 subtitle: subtitle.trim() || null,
-                fields: pruneEmpty(fields),
+                fields: pruneEmpty(fields) as never,
                 notes: notes.trim() || null,
                 tags: tagsInput.split(",").map((t) => t.trim()).filter(Boolean),
               })
