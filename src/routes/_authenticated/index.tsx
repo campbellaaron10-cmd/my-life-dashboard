@@ -187,6 +187,9 @@ function Dashboard() {
           <h1 className="text-4xl font-bold tracking-tight md:text-5xl">{greeting}</h1>
         </div>
         <Link to="/weather" className="text-right transition-opacity hover:opacity-80">
+          <div className="mb-1 flex items-center justify-end">
+            <LiveClock timeZone={timeZone} />
+          </div>
           <p className="flex items-center justify-end gap-2 text-4xl font-light tracking-tight">
             {weather.data ? weatherIcon(weather.data.now.code) : <Sun className="size-8 text-primary" />}
             {weather.data ? `${Math.round(weather.data.now.temperature)}°` : "—"}
