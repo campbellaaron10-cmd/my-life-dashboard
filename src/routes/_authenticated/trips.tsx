@@ -6,7 +6,7 @@ import {
   Pencil, X,
 } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
-import { PrivacyGuard } from "@/components/atlas/PrivacyGuard";
+import { PrivacyGuard } from "@/context/PrivacyMode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
