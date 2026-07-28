@@ -1,118 +1,140 @@
-## Phase 2 — Productivity & Knowledge
+## Knowledge Vault — Architecture Revision (Final)
 
-Goal: extend Atlas beyond Finances + Food into a connected productivity system where **Tasks** is the action engine, **Calendar** mirrors Google, **Trips** plans travel + places + bucket list, and the **Knowledge Vault** is the long-term reference layer. Modules share data via a small "action source" pattern so anything can generate a Task or Dashboard alert.
-
-I'll build the four modules in order, each shippable on its own so you can start using them immediately.
+Life-area library, template-only capture, connected data across Atlas, and a dedicated automation layer that turns Vault dates into real Tasks.
 
 ---
 
-### Stage 1 — Tasks (Action Center)
+### 1. Data model
 
-**Schema** (extend existing `tasks`, add supporting tables):
-- Add columns to `tasks`: `category text`, `project_id uuid`, `recurrence_rule jsonb` (interval, unit, anchor), `next_due_on date`, `source_module text`, `source_ref jsonb`, `mileage_at_completion int` (for oil-change style rules).
-- New `projects` table: id, user_id, name, description, color, status, created_at.
-- New `task_attachments` table: id, task_id, name, url, mime, size_bytes. Storage bucket `attachments/`.
-- `has_role`-scoped RLS + GRANTs on all new tables per project rules.
+Extend `vault_entries`:
+- `area` — `home | vehicles | travel | finance | outdoor | reference | unfiled` (Reference replaces General/Learning; Unfiled is the temporary inbox).
+- `parent_id` (uuid, nullable self-ref) — attach warranties/documents/notes to a primary asset.
+- `attachments` (jsonb: `{ label, url, kind }[]`).
+- `related_trip_ids` (uuid[]) — alongside existing `related_project_id`, `related_task_ids`.
+- `tags` stays `text[]` but is edited as reusable chips (see §7).
 
-**UI (`/tasks` redesign):**
-- Left rail: Inbox / Today / Upcoming / Overdue / Completed + Projects list + Categories chips.
-- Center: task list with inline complete, priority pill, due date, recurrence badge, project tag.
-- Right: task detail drawer (notes, attachments, recurrence editor, related items).
-- Top: search + filter chips (priority, project, category, due window).
-- Task form supports recurrence: "every N days/weeks/months", "every N miles", "annually on date", plus one-off due date.
-- Completing a recurring task auto-creates the next occurrence via `next_due_on`.
+New table `vault_tags(user_id, name)` for the reusable chip vocabulary — indexed on `(user_id, name)`.
 
-**Cross-module action sources** (unified pattern — foundation for the rest):
-- New helper `createTaskFromSource(source_module, source_ref, template)` used by Pantry (low stock), Recipes (missing ingredients — already partially there), Finance (transfer reminders), Weather (freeze/rain-triggered), Calendar (event prep), Trips (packing/pre-trip).
-- Existing shopping-task generator refactored onto this pattern.
+New table `vault_reminders` (dedicated, not JSONB):
+```text
+id uuid pk
+user_id uuid
+entry_id uuid → vault_entries(id) on delete cascade
+label text
+trigger_kind text            -- 'date' now; 'mileage' reserved for later
+field_key text               -- which entry field holds the source date
+lead_days int                -- fire N days before the field's date
+repeat text                  -- 'none' | 'yearly' | 'monthly'
+mileage_interval int         -- null for now; forward-compat
+mileage_last_at int          -- null for now
+active bool
+next_fire_on date            -- computed on write
+last_generated_cycle text    -- 'YYYY-MM-DD' of the source date consumed
+last_generated_task_id uuid  -- soft link to tasks(id), nullable
+created_at / updated_at
+```
 
-**Dashboard widget:** already exists; upgrades to show project tag, recurrence badge, and "Water ZZ plant tomorrow" style upcoming previews.
+Hard uniqueness for idempotency:
+```sql
+UNIQUE (reminder_id, last_generated_cycle)  -- enforced via a helper log table:
+
+CREATE TABLE vault_reminder_runs (
+  reminder_id uuid REFERENCES vault_reminders(id) ON DELETE CASCADE,
+  cycle_key text NOT NULL,            -- e.g. '2026-08-15' or 'mileage-45000'
+  task_id uuid,
+  ran_at timestamptz DEFAULT now(),
+  PRIMARY KEY (reminder_id, cycle_key)
+);
+```
+The processor `INSERT … ON CONFLICT DO NOTHING` into `vault_reminder_runs` before creating the task, guaranteeing at-most-once per cycle even under retries.
+
+All new tables get RLS `auth.uid() = user_id` + explicit GRANTs to `authenticated` and `service_role`.
+
+### 2. Templates (capture-only, in "+ New Entry")
+
+Note, Guide (was Playbook), Vehicle, Home Asset, Contact, Document, Warranty.
+
+**Project template is deferred** until the Projects workspace ships — projects will be first-class records there, not Vault duplicates. Existing playbook rows keep their value; UI relabels to "Guide".
+
+Standalone Camping is folded into Notes/Guides under Outdoor (backfill preserves data).
+
+### 3. Sidebar = life areas
+
+```text
+All entries · Pinned · Reminders
+────────────────────────────────
+Home         Vehicles
+Travel       Finance
+Outdoor      Reference
+────────────────────────────────
+Unfiled                       (inbox for entries missing an area)
+```
+
+Every entry has an area (default from template; user-editable). Template counts move into the "+ New Entry" popover.
+
+### 4. Parent / child relationships
+
+- Vehicle and Home Asset entries surface an **Attached items** section with quick-add for warranties, documents, notes, guides.
+- The Warranty and Document dialogs default to **"Attach to an asset"** (searchable picker of Vehicles + Home Assets); "Save as standalone" remains available.
+- Child cards show a `↳ 2019 4Runner` breadcrumb in lists and search.
+- Deleting a parent prompts reassign or cascade.
+
+### 5. Cross-module Related panel
+
+Reuses existing link columns + new `related_trip_ids`. Cards surface "Linked: 3 tasks · 1 trip" when present. Vault entries never modify Trip/Task data — they only reference it.
+
+### 6. Automation — Vault memory, Tasks engine
+
+**Contract:** the Vault date is the source of truth. Reminders generate Tasks; they never write back into the entry's fields. Editing the source date recomputes `next_fire_on` on save. Deleting a reminder does not touch already-generated tasks.
+
+**Reminder editor** lives next to each date field inside a "Reminders" section — "Remind me before this date" → lead-time + repeat + label.
+
+**Processor:** new authenticated TanStack server route `/api/public/hooks/process-vault-reminders`:
+- Verifies caller with `apikey: <anon-key>` header (pg_cron pattern) + a stored `VAULT_REMINDER_SECRET` bearer for defense in depth; both must match or 401.
+- Loads active reminders where `next_fire_on <= today` in batches.
+- For each: `INSERT INTO vault_reminder_runs(reminder_id, cycle_key)` — if it collides, skip (idempotent).
+- On successful insert, create a task via `supabaseAdmin` with `source_module='vault'` and `source_ref={entry_id, reminder_id, cycle_key}`; store `task_id` back on the run row.
+- Recompute `next_fire_on` for repeating reminders; one-off reminders flip `active=false`.
+- Scheduled daily via `pg_cron` + `pg_net`.
+
+**Forward-compat for mileage:** `trigger_kind='mileage'` with `mileage_interval` + `mileage_last_at` and a cycle_key like `mileage-45000`. Editor and processor branches on `trigger_kind`; UI hides mileage until Vehicle mileage lives on the Vehicle entry itself. No mileage work ships in this pass — schema only.
+
+**Sidebar → Reminders view** lists all active reminders with next fire date, target entry, and last-generated task link.
+
+### 7. UI — preserve the design, restructure the form
+
+Same glass cards, dark theme, modal chrome. Deltas:
+
+- **Vault landing (no search):** three stacked strips — **Pinned**, **Recently updated**, **Upcoming reminders (next 30 days)** — instead of dumping the full list. Full list stays one click away via "All entries".
+- **Entry dialog** replaces the single scrolling form with tabs:
+  - **Overview** — title, subtitle, area, tags, pinned.
+  - **Details** — template-specific fields.
+  - **Attachments** — file/link list with label + URL + kind.
+  - **Related** — tasks, trips, project, peer entries.
+  - **Reminders** — reminder rows tied to date fields.
+- **Tag chips** — reusable across entries: chip picker with autocomplete from `vault_tags`, "+ Create tag" inline, click chip on a card to filter by that tag. Replaces the comma-separated string.
+- **Cards** — add parent breadcrumb and a compact "linked" row when present; no other visual changes.
+
+### 8. Search first (unchanged intent)
+
+Search across title, subtitle, notes, tags, all field values, area, template, and parent title. Results grouped by area with template icon + breadcrumb. `/` focuses search anywhere on the Vault page.
 
 ---
 
-### Stage 2 — Calendar (Google Sync)
-
-**Integration:** Google Calendar via the App User Connector pattern (each user connects their own Google account) — chosen so tokens are per-user and stored server-side encrypted.
-- Setup uses `connector_app_user--connect_client` for the Google Calendar connector.
-- Server functions `listEvents`, `createEvent`, `updateEvent` call the gateway with the app-user credential.
-- Local cache table `calendar_events_cache` (id, google_id, calendar_id, title, start_ts, end_ts, all_day, location, description, updated_at) for fast dashboard reads; refreshed on load and on-demand.
-
-**UI (`/calendar`):**
-- Month / Week / Day views (headless components; use `date-fns` + custom grid to keep the Glass aesthetic).
-- Today's Agenda strip on top.
-- Tasks with `due_on` overlay on the calendar (read-only there, edited in Tasks).
-- Birthdays & vacation countdowns pulled from a lightweight `personal_dates` table (name, date, kind, recurring).
-
-**Dashboard widget:** Today's next 3 events + tomorrow's first event; Briefing surfaces "Dentist at 2 PM" style alerts.
-
----
-
-### Stage 3 — Trips (Planner + Places + Bucket List)
-
-Three linked sub-routes under `/trips`.
-
-**Schema:**
-- `trips`: id, user_id, name, destination, start_date, end_date, budget, status (planning/booked/active/past), notes, cover_image_url.
-- `trip_items`: id, trip_id, kind (hotel/flight/restaurant/activity/reservation), title, when_ts, cost, url, confirmation, notes.
-- `trip_packing`: id, trip_id, label, is_packed, category.
-- `places`: id, user_id, name, category, lat, lon, google_maps_url, rating, notes, cost_estimate, travel_time_minutes, tags text[], photo_url.
-- `bucket_list`: id, user_id, title, category, estimated_budget, estimated_vacation_days, notes, progress_pct, status.
-- `bucket_places` join table linking a bucket item to saved `places` and generated `tasks`.
-
-**UI:**
-- `/trips` → list + countdown cards, click into detail with tabs: Overview / Reservations / Packing / Map / Photos / Related Tasks.
-- `/trips/places` → map-first view (Google Maps JS API via a user-provided key or Mapbox — we'll decide when we hit this stage). Saved-place cards with rating stars, category filters, tag search.
-- `/trips/bucket-list` → grid of dream goals with progress rings; each item can spawn tasks + save related places.
-
-**Dashboard:** Nearest upcoming trip countdown + packing progress.
-
----
-
-### Stage 4 — Knowledge Vault + Projects
-
-**Schema:**
-- `knowledge_notes`: id, user_id, title, body_md, category, tags text[], project_id (nullable), pinned, related_ids uuid[], updated_at.
-- `knowledge_attachments`: id, note_id, name, url, mime.
-- `restaurant_reviews` (specialization of notes): note_id, food_rating, vibes_rating, service_rating, price_range, custom_ratings jsonb.
-- `projects` already exists from Stage 1 — extend with: budget, files, photos, progress_pct, related_note_ids uuid[].
-
-**UI:**
-- `/vault` → sidebar of categories + tags, center list, right editor (markdown with slash-menu for tables/checklists).
-- `/vault/projects/:id` → project workspace: tasks (filtered from `tasks`), notes, budget rollup, photo grid, progress bar.
-- Global search across notes + linked resources.
-- Restaurant review template with rating dimensions you can customize.
-
-**Dashboard:** Warranty/maintenance reminders (notes with `remind_on` field → auto-generated tasks 30 days before).
-
----
-
-### Cross-cutting
-
-- **Design language:** all modules reuse `GlassCard`, existing color tokens, `Select`/`Input`/`Button` shadcn primitives, and Finance/Food card patterns. No new fonts or palettes.
-- **Data cohesion:** every new module either produces tasks (Pantry low, weather, trips) or consumes them (Calendar overlay, Project workspace, Bucket list). Dashboard Briefing gets a new input for each stage.
-- **Privacy Mode:** trips + finance-touching notes respect Private/Guest guards.
-
----
+### Out of scope this pass
+- Projects template (returns when Projects workspace ships).
+- Mileage-based reminders (schema-ready, UI deferred).
+- Semantic/NL search — substring only.
+- Google Photos / real file uploads — attachments are label + URL.
 
 ### Technical notes
 
-- Recurrence stored as `{ every: number, unit: "day"|"week"|"month"|"year"|"mile", anchor: "due"|"completed" }`. Mile-based ("every 5,000 mi") completes when user enters current mileage on the task; a vehicle profile in the Vault stores odometer.
-- Google Calendar auth uses App User Connector; do NOT use App-level (workspace) OAuth — this is per-user data.
-- Google Maps API key: I'll ask when we reach `/trips/places`; alternative is Mapbox — cheaper for personal use.
-- File attachments use a Supabase storage bucket per surface (`attachments`, `trip-photos`, `vault-files`), all private with signed URLs.
-- All new tables get RLS `auth.uid() = user_id` policies + explicit GRANT to authenticated/service_role.
+- **Migration** adds columns to `vault_entries`, creates `vault_tags`, `vault_reminders`, `vault_reminder_runs`, with GRANTs + RLS + `updated_at` triggers. Backfills `area` from current template (`vehicle→vehicles`, `home→home`, `camping→outdoor`, `playbook→reference`, otherwise `unfiled`). Splits current comma tags into `vault_tags` rows per user.
+- **Server route** `src/routes/api/public/hooks/process-vault-reminders.ts` — auth check, batched processing, ON CONFLICT idempotency, structured logs.
+- **pg_cron** daily schedule via `supabase--insert` (not migration) posting to the stable `project--<id>.lovable.app` URL with `apikey` header.
+- **`src/lib/atlas-data.ts`** — extend `VaultEntry`, add `useVaultChildren`, `useVaultReminders`, `useUpsertVaultReminder`, `useVaultTags`.
+- **`src/lib/vault-templates.ts`** — drop Camping, rename Playbook → Guide, remove Project.
+- **`src/routes/_authenticated/vault.tsx`** — area sidebar, tabbed entry dialog, tag chip picker, reminders section, landing strips, "+ New Entry" template popover, parent breadcrumbs.
+- **Secrets** — add `VAULT_REMINDER_SECRET` via `secrets--add_secret`.
 
----
-
-### Suggested ship order
-
-1. Tasks redesign + recurrence + projects (foundation).
-2. Cross-module task generators refactor (small).
-3. Calendar with Google sync + today's agenda.
-4. Trips planner + packing + countdowns.
-5. Places map view.
-6. Bucket list.
-7. Knowledge Vault base.
-8. Vault ↔ Projects ↔ Tasks integration + Dashboard consolidation.
-
-I'll pause between each stage so you can use it before we move to the next.
+Ready to build.
