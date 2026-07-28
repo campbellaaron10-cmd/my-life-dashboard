@@ -21,6 +21,7 @@ import { Route as AuthenticatedPantryRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMoneyRouteImport } from './routes/_authenticated/money'
 import { Route as AuthenticatedFoodsRouteImport } from './routes/_authenticated/foods'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedTripsTripIdRouteImport } from './routes/_authenticated/trips.$tripId'
 import { Route as ApiPublicHooksProcessVaultRemindersRouteImport } from './routes/api/public/hooks/process-vault-reminders'
 
 const AuthRoute = AuthRouteImport.update({
@@ -82,6 +83,12 @@ const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTripsTripIdRoute =
+  AuthenticatedTripsTripIdRouteImport.update({
+    id: '/$tripId',
+    path: '/$tripId',
+    getParentRoute: () => AuthenticatedTripsRoute,
+  } as any)
 const ApiPublicHooksProcessVaultRemindersRoute =
   ApiPublicHooksProcessVaultRemindersRouteImport.update({
     id: '/api/public/hooks/process-vault-reminders',
@@ -98,9 +105,10 @@ export interface FileRoutesByFullPath {
   '/pantry': typeof AuthenticatedPantryRoute
   '/recipes': typeof AuthenticatedRecipesRoute
   '/tasks': typeof AuthenticatedTasksRoute
-  '/trips': typeof AuthenticatedTripsRoute
+  '/trips': typeof AuthenticatedTripsRouteWithChildren
   '/vault': typeof AuthenticatedVaultRoute
   '/weather': typeof AuthenticatedWeatherRoute
+  '/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRoutesByTo {
@@ -111,10 +119,11 @@ export interface FileRoutesByTo {
   '/pantry': typeof AuthenticatedPantryRoute
   '/recipes': typeof AuthenticatedRecipesRoute
   '/tasks': typeof AuthenticatedTasksRoute
-  '/trips': typeof AuthenticatedTripsRoute
+  '/trips': typeof AuthenticatedTripsRouteWithChildren
   '/vault': typeof AuthenticatedVaultRoute
   '/weather': typeof AuthenticatedWeatherRoute
   '/': typeof AuthenticatedIndexRoute
+  '/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRoutesById {
@@ -127,10 +136,11 @@ export interface FileRoutesById {
   '/_authenticated/pantry': typeof AuthenticatedPantryRoute
   '/_authenticated/recipes': typeof AuthenticatedRecipesRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
-  '/_authenticated/trips': typeof AuthenticatedTripsRoute
+  '/_authenticated/trips': typeof AuthenticatedTripsRouteWithChildren
   '/_authenticated/vault': typeof AuthenticatedVaultRoute
   '/_authenticated/weather': typeof AuthenticatedWeatherRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRouteTypes {
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/trips'
     | '/vault'
     | '/weather'
+    | '/trips/$tripId'
     | '/api/public/hooks/process-vault-reminders'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/vault'
     | '/weather'
     | '/'
+    | '/trips/$tripId'
     | '/api/public/hooks/process-vault-reminders'
   id:
     | '__root__'
@@ -176,6 +188,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vault'
     | '/_authenticated/weather'
     | '/_authenticated/'
+    | '/_authenticated/trips/$tripId'
     | '/api/public/hooks/process-vault-reminders'
   fileRoutesById: FileRoutesById
 }
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/trips/$tripId': {
+      id: '/_authenticated/trips/$tripId'
+      path: '/$tripId'
+      fullPath: '/trips/$tripId'
+      preLoaderRoute: typeof AuthenticatedTripsTripIdRouteImport
+      parentRoute: typeof AuthenticatedTripsRoute
+    }
     '/api/public/hooks/process-vault-reminders': {
       id: '/api/public/hooks/process-vault-reminders'
       path: '/api/public/hooks/process-vault-reminders'
@@ -281,6 +301,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedTripsRouteChildren {
+  AuthenticatedTripsTripIdRoute: typeof AuthenticatedTripsTripIdRoute
+}
+
+const AuthenticatedTripsRouteChildren: AuthenticatedTripsRouteChildren = {
+  AuthenticatedTripsTripIdRoute: AuthenticatedTripsTripIdRoute,
+}
+
+const AuthenticatedTripsRouteWithChildren =
+  AuthenticatedTripsRoute._addFileChildren(AuthenticatedTripsRouteChildren)
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedFoodsRoute: typeof AuthenticatedFoodsRoute
@@ -288,7 +319,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPantryRoute: typeof AuthenticatedPantryRoute
   AuthenticatedRecipesRoute: typeof AuthenticatedRecipesRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
-  AuthenticatedTripsRoute: typeof AuthenticatedTripsRoute
+  AuthenticatedTripsRoute: typeof AuthenticatedTripsRouteWithChildren
   AuthenticatedVaultRoute: typeof AuthenticatedVaultRoute
   AuthenticatedWeatherRoute: typeof AuthenticatedWeatherRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -301,7 +332,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPantryRoute: AuthenticatedPantryRoute,
   AuthenticatedRecipesRoute: AuthenticatedRecipesRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
-  AuthenticatedTripsRoute: AuthenticatedTripsRoute,
+  AuthenticatedTripsRoute: AuthenticatedTripsRouteWithChildren,
   AuthenticatedVaultRoute: AuthenticatedVaultRoute,
   AuthenticatedWeatherRoute: AuthenticatedWeatherRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
