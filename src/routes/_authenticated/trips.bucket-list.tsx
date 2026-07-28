@@ -51,7 +51,7 @@ function BucketListPage() {
       cover_url: b.cover_url,
       trip_type: "leisure",
     } as any);
-    await upsert.mutateAsync({ id: b.id, status: "in_progress", related_trip_id: row.id });
+    await upsert.mutateAsync({ id: b.id, title: b.title, status: "in_progress", related_trip_id: row.id });
     navigate({ to: "/trips/$tripId", params: { tripId: row.id } });
   }
 
