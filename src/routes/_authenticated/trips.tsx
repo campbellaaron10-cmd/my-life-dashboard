@@ -272,14 +272,25 @@ function TripCard({ trip }: { trip: Trip }) {
   const d = daysUntil(trip.start_date);
   const s = STATUS_META[trip.status];
   const label = (trip as any).destination_text ?? trip.destination ?? trip.name;
+  const navigate = useNavigate();
+  const [imgFailed, setImgFailed] = useState(false);
   return (
     <div className="group relative">
-      <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="block">
+      <button
+        type="button"
+        onClick={() => navigate({ to: "/trips/$tripId", params: { tripId: trip.id } })}
+        className="block w-full text-left"
+      >
         <GlassCard className="relative h-full overflow-hidden p-0">
           <div className="relative h-32 w-full overflow-hidden">
-            {trip.cover_url ? (
-              <img src={trip.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            {trip.cover_url && !imgFailed ? (
+              <img
+                src={trip.cover_url}
+                alt=""
+                className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                referrerPolicy="no-referrer"
+                onError={() => setImgFailed(true)}
+              />
             ) : (
               <TripCoverFallback label={label} />
             )}
@@ -305,17 +316,18 @@ function TripCard({ trip }: { trip: Trip }) {
             </p>
           </div>
         </GlassCard>
-      </Link>
-      <Link
-        to="/trips/$tripId"
-        params={{ tripId: trip.id }}
-        search={{ edit: 1 } as any}
-        onClick={(e) => e.stopPropagation()}
+      </button>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate({ to: "/trips/$tripId", params: { tripId: trip.id }, search: { edit: 1 } as any });
+        }}
         aria-label={`Edit ${trip.name}`}
-        className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[10px] font-mono uppercase tracking-widest text-white/90 opacity-0 backdrop-blur transition-opacity hover:bg-black/80 group-hover:opacity-100 focus:opacity-100"
+        className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[10px] font-mono uppercase tracking-widest text-white/90 backdrop-blur transition-opacity hover:bg-black/80 opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
       >
         <Pencil className="size-3" /> Edit
-      </Link>
+      </button>
     </div>
   );
 }
