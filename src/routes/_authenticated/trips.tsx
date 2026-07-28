@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Plane, MapPin, Sparkles, Compass } from "lucide-react";
+import { Plus, Plane, MapPin, Sparkles, Compass, Pencil } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
