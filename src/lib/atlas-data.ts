@@ -1362,10 +1362,18 @@ export function useUpsertVaultEntry() {
         .select()
         .single();
       if (error) throw error;
+      // Seed reusable tag vocabulary — non-blocking on failure.
+      const tags = (input.tags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean);
+      if (tags.length) {
+        await supabase
+          .from("vault_tags")
+          .upsert(tags.map((name) => ({ user_id, name })), { onConflict: "user_id,name" });
+      }
       return data as VaultEntry;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.vault });
+      qc.invalidateQueries({ queryKey: qk.vaultTags });
       toast.success("Saved to Vault");
     },
     onError: (e: Error) => toast.error(e.message),
