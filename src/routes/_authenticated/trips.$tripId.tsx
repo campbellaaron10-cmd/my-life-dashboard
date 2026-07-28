@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ArrowLeft, Calendar, MapPin, Plane, Wallet, Package, Camera, StickyNote,
   Plus, Trash2, ExternalLink, Star, ListChecks, Compass,
