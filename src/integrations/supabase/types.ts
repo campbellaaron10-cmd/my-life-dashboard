@@ -146,6 +146,111 @@ export type Database = {
           },
         ]
       }
+      bucket_item_places: {
+        Row: {
+          bucket_item_id: string
+          created_at: string
+          id: string
+          place_id: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          bucket_item_id: string
+          created_at?: string
+          id?: string
+          place_id: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          bucket_item_id?: string
+          created_at?: string
+          id?: string
+          place_id?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bucket_item_places_bucket_item_id_fkey"
+            columns: ["bucket_item_id"]
+            isOneToOne: false
+            referencedRelation: "bucket_list_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bucket_item_places_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bucket_list_items: {
+        Row: {
+          category: string | null
+          cover_url: string | null
+          created_at: string
+          description: string | null
+          estimated_cost: number | null
+          id: string
+          ideal_season: string | null
+          is_archived: boolean
+          notes: string | null
+          progress_pct: number
+          related_trip_id: string | null
+          requirements: string | null
+          sort_order: number
+          status: Database["public"]["Enums"]["bucket_status"]
+          title: string
+          updated_at: string
+          user_id: string
+          vacation_days_needed: number | null
+        }
+        Insert: {
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          estimated_cost?: number | null
+          id?: string
+          ideal_season?: string | null
+          is_archived?: boolean
+          notes?: string | null
+          progress_pct?: number
+          related_trip_id?: string | null
+          requirements?: string | null
+          sort_order?: number
+          status?: Database["public"]["Enums"]["bucket_status"]
+          title: string
+          updated_at?: string
+          user_id: string
+          vacation_days_needed?: number | null
+        }
+        Update: {
+          category?: string | null
+          cover_url?: string | null
+          created_at?: string
+          description?: string | null
+          estimated_cost?: number | null
+          id?: string
+          ideal_season?: string | null
+          is_archived?: boolean
+          notes?: string | null
+          progress_pct?: number
+          related_trip_id?: string | null
+          requirements?: string | null
+          sort_order?: number
+          status?: Database["public"]["Enums"]["bucket_status"]
+          title?: string
+          updated_at?: string
+          user_id?: string
+          vacation_days_needed?: number | null
+        }
+        Relationships: []
+      }
       budget_categories: {
         Row: {
           code: string
@@ -517,6 +622,72 @@ export type Database = {
         }
         Relationships: []
       }
+      places: {
+        Row: {
+          address: string | null
+          category: string
+          created_at: string
+          estimated_cost: number | null
+          google_place_id: string | null
+          id: string
+          is_archived: boolean
+          lat: number | null
+          lng: number | null
+          maps_url: string | null
+          name: string
+          notes: string | null
+          photos: Json
+          rating: number | null
+          status: string
+          tags: string[]
+          travel_time_minutes: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          category?: string
+          created_at?: string
+          estimated_cost?: number | null
+          google_place_id?: string | null
+          id?: string
+          is_archived?: boolean
+          lat?: number | null
+          lng?: number | null
+          maps_url?: string | null
+          name: string
+          notes?: string | null
+          photos?: Json
+          rating?: number | null
+          status?: string
+          tags?: string[]
+          travel_time_minutes?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          category?: string
+          created_at?: string
+          estimated_cost?: number | null
+          google_place_id?: string | null
+          id?: string
+          is_archived?: boolean
+          lat?: number | null
+          lng?: number | null
+          maps_url?: string | null
+          name?: string
+          notes?: string | null
+          photos?: Json
+          rating?: number | null
+          status?: string
+          tags?: string[]
+          travel_time_minutes?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -877,6 +1048,47 @@ export type Database = {
           },
         ]
       }
+      trip_budget_allocations: {
+        Row: {
+          allocated: number
+          category: string
+          created_at: string
+          id: string
+          sort_order: number
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          allocated?: number
+          category: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          allocated?: number
+          category?: string
+          created_at?: string
+          id?: string
+          sort_order?: number
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_budget_allocations_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trip_expenses: {
         Row: {
           amount: number
@@ -924,18 +1136,94 @@ export type Database = {
           },
         ]
       }
+      trip_flights: {
+        Row: {
+          airline: string | null
+          arrive_airport: string | null
+          arrive_at: string | null
+          confirmation_code: string | null
+          cost: number | null
+          created_at: string
+          depart_airport: string | null
+          depart_at: string | null
+          flight_number: string | null
+          id: string
+          notes: string | null
+          seat: string | null
+          sort_order: number
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          airline?: string | null
+          arrive_airport?: string | null
+          arrive_at?: string | null
+          confirmation_code?: string | null
+          cost?: number | null
+          created_at?: string
+          depart_airport?: string | null
+          depart_at?: string | null
+          flight_number?: string | null
+          id?: string
+          notes?: string | null
+          seat?: string | null
+          sort_order?: number
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          airline?: string | null
+          arrive_airport?: string | null
+          arrive_at?: string | null
+          confirmation_code?: string | null
+          cost?: number | null
+          created_at?: string
+          depart_airport?: string | null
+          depart_at?: string | null
+          flight_number?: string | null
+          id?: string
+          notes?: string | null
+          seat?: string | null
+          sort_order?: number
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_flights_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trip_items: {
         Row: {
+          all_day: boolean
+          check_in_at: string | null
+          check_out_at: string | null
+          confirmation_code: string | null
           cost: number
           created_at: string
+          end_time: string | null
           ends_at: string | null
+          estimated_cost: number | null
           id: string
           kind: Database["public"]["Enums"]["trip_item_kind"]
           location: string | null
           notes: string | null
           on_date: string | null
+          place_id: string | null
+          provider: string | null
+          reservation_url: string | null
           sort_order: number
+          start_time: string | null
           starts_at: string | null
+          timezone: string | null
           title: string
           trip_id: string
           updated_at: string
@@ -943,16 +1231,27 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          all_day?: boolean
+          check_in_at?: string | null
+          check_out_at?: string | null
+          confirmation_code?: string | null
           cost?: number
           created_at?: string
+          end_time?: string | null
           ends_at?: string | null
+          estimated_cost?: number | null
           id?: string
           kind?: Database["public"]["Enums"]["trip_item_kind"]
           location?: string | null
           notes?: string | null
           on_date?: string | null
+          place_id?: string | null
+          provider?: string | null
+          reservation_url?: string | null
           sort_order?: number
+          start_time?: string | null
           starts_at?: string | null
+          timezone?: string | null
           title: string
           trip_id: string
           updated_at?: string
@@ -960,16 +1259,27 @@ export type Database = {
           user_id: string
         }
         Update: {
+          all_day?: boolean
+          check_in_at?: string | null
+          check_out_at?: string | null
+          confirmation_code?: string | null
           cost?: number
           created_at?: string
+          end_time?: string | null
           ends_at?: string | null
+          estimated_cost?: number | null
           id?: string
           kind?: Database["public"]["Enums"]["trip_item_kind"]
           location?: string | null
           notes?: string | null
           on_date?: string | null
+          place_id?: string | null
+          provider?: string | null
+          reservation_url?: string | null
           sort_order?: number
+          start_time?: string | null
           starts_at?: string | null
+          timezone?: string | null
           title?: string
           trip_id?: string
           updated_at?: string
@@ -978,7 +1288,228 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "trip_items_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "trip_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_packing_items: {
+        Row: {
+          category: string | null
+          created_at: string
+          id: string
+          name: string
+          needs_action: boolean
+          packed: boolean
+          quantity: number
+          sort_order: number
+          task_id: string | null
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          needs_action?: boolean
+          packed?: boolean
+          quantity?: number
+          sort_order?: number
+          task_id?: string | null
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          needs_action?: boolean
+          packed?: boolean
+          quantity?: number
+          sort_order?: number
+          task_id?: string | null
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_packing_items_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          external_id: string | null
+          id: string
+          place_id: string | null
+          sort_order: number
+          source: string
+          source_metadata: Json
+          taken_on: string | null
+          trip_id: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          place_id?: string | null
+          sort_order?: number
+          source?: string
+          source_metadata?: Json
+          taken_on?: string | null
+          trip_id: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          external_id?: string | null
+          id?: string
+          place_id?: string | null
+          sort_order?: number
+          source?: string
+          source_metadata?: Json
+          taken_on?: string | null
+          trip_id?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_photos_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_photos_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_places: {
+        Row: {
+          created_at: string
+          id: string
+          is_favorite: boolean
+          note: string | null
+          place_id: string
+          sort_order: number
+          trip_id: string
+          updated_at: string
+          user_id: string
+          visited: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          note?: string | null
+          place_id: string
+          sort_order?: number
+          trip_id: string
+          updated_at?: string
+          user_id: string
+          visited?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_favorite?: boolean
+          note?: string | null
+          place_id?: string
+          sort_order?: number
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+          visited?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_places_place_id_fkey"
+            columns: ["place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_places_trip_id_fkey"
+            columns: ["trip_id"]
+            isOneToOne: false
+            referencedRelation: "trips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_travelers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          role: string | null
+          trip_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          role?: string | null
+          trip_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          role?: string | null
+          trip_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_travelers_trip_id_fkey"
             columns: ["trip_id"]
             isOneToOne: false
             referencedRelation: "trips"
@@ -990,55 +1521,103 @@ export type Database = {
         Row: {
           budget: number
           color: string | null
+          cover_place_id: string | null
           cover_url: string | null
           created_at: string
           destination: string | null
+          destination_place_id: string | null
+          destination_text: string | null
           end_date: string | null
+          final_expenses: number | null
+          home_lat: number | null
+          home_lng: number | null
           id: string
           is_archived: boolean
+          lessons_learned: string | null
           name: string
           notes: string | null
+          rating: number | null
           related_project_id: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["trip_status"]
+          timezone: string | null
+          trip_type: string
           updated_at: string
           user_id: string
+          would_visit_again: boolean | null
         }
         Insert: {
           budget?: number
           color?: string | null
+          cover_place_id?: string | null
           cover_url?: string | null
           created_at?: string
           destination?: string | null
+          destination_place_id?: string | null
+          destination_text?: string | null
           end_date?: string | null
+          final_expenses?: number | null
+          home_lat?: number | null
+          home_lng?: number | null
           id?: string
           is_archived?: boolean
+          lessons_learned?: string | null
           name: string
           notes?: string | null
+          rating?: number | null
           related_project_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["trip_status"]
+          timezone?: string | null
+          trip_type?: string
           updated_at?: string
           user_id: string
+          would_visit_again?: boolean | null
         }
         Update: {
           budget?: number
           color?: string | null
+          cover_place_id?: string | null
           cover_url?: string | null
           created_at?: string
           destination?: string | null
+          destination_place_id?: string | null
+          destination_text?: string | null
           end_date?: string | null
+          final_expenses?: number | null
+          home_lat?: number | null
+          home_lng?: number | null
           id?: string
           is_archived?: boolean
+          lessons_learned?: string | null
           name?: string
           notes?: string | null
+          rating?: number | null
           related_project_id?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["trip_status"]
+          timezone?: string | null
+          trip_type?: string
           updated_at?: string
           user_id?: string
+          would_visit_again?: boolean | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "trips_cover_place_id_fkey"
+            columns: ["cover_place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trips_destination_place_id_fkey"
+            columns: ["destination_place_id"]
+            isOneToOne: false
+            referencedRelation: "places"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -1313,6 +1892,7 @@ export type Database = {
         | "other"
       activity_kind: "transaction" | "task" | "pantry" | "grocery" | "system"
       app_role: "owner" | "member" | "guest"
+      bucket_status: "idea" | "planned" | "in_progress" | "done"
       nutrition_source: "usda" | "manual" | "barcode" | "imported"
       personal_date_kind:
         | "birthday"
@@ -1477,6 +2057,7 @@ export const Constants = {
       ],
       activity_kind: ["transaction", "task", "pantry", "grocery", "system"],
       app_role: ["owner", "member", "guest"],
+      bucket_status: ["idea", "planned", "in_progress", "done"],
       nutrition_source: ["usda", "manual", "barcode", "imported"],
       personal_date_kind: [
         "birthday",
