@@ -21,6 +21,7 @@ import { Route as AuthenticatedPantryRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMoneyRouteImport } from './routes/_authenticated/money'
 import { Route as AuthenticatedFoodsRouteImport } from './routes/_authenticated/foods'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as ApiPublicHooksProcessVaultRemindersRouteImport } from './routes/api/public/hooks/process-vault-reminders'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -81,6 +82,12 @@ const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksProcessVaultRemindersRoute =
+  ApiPublicHooksProcessVaultRemindersRouteImport.update({
+    id: '/api/public/hooks/process-vault-reminders',
+    path: '/api/public/hooks/process-vault-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/trips': typeof AuthenticatedTripsRoute
   '/vault': typeof AuthenticatedVaultRoute
   '/weather': typeof AuthenticatedWeatherRoute
+  '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
@@ -107,6 +115,7 @@ export interface FileRoutesByTo {
   '/vault': typeof AuthenticatedVaultRoute
   '/weather': typeof AuthenticatedWeatherRoute
   '/': typeof AuthenticatedIndexRoute
+  '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,6 +131,7 @@ export interface FileRoutesById {
   '/_authenticated/vault': typeof AuthenticatedVaultRoute
   '/_authenticated/weather': typeof AuthenticatedWeatherRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/trips'
     | '/vault'
     | '/weather'
+    | '/api/public/hooks/process-vault-reminders'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/vault'
     | '/weather'
     | '/'
+    | '/api/public/hooks/process-vault-reminders'
   id:
     | '__root__'
     | '/_authenticated'
@@ -164,11 +176,13 @@ export interface FileRouteTypes {
     | '/_authenticated/vault'
     | '/_authenticated/weather'
     | '/_authenticated/'
+    | '/api/public/hooks/process-vault-reminders'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  ApiPublicHooksProcessVaultRemindersRoute: typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -257,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/process-vault-reminders': {
+      id: '/api/public/hooks/process-vault-reminders'
+      path: '/api/public/hooks/process-vault-reminders'
+      fullPath: '/api/public/hooks/process-vault-reminders'
+      preLoaderRoute: typeof ApiPublicHooksProcessVaultRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -292,17 +313,9 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  ApiPublicHooksProcessVaultRemindersRoute:
+    ApiPublicHooksProcessVaultRemindersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

@@ -22,6 +22,8 @@ export type BalanceSnapshot = Tables["balance_snapshots"]["Row"];
 export type Project = Tables["projects"]["Row"];
 export type PersonalDate = Tables["personal_dates"]["Row"];
 export type VaultEntry = Tables["vault_entries"]["Row"];
+export type VaultTag = Tables["vault_tags"]["Row"];
+export type VaultReminder = Tables["vault_reminders"]["Row"];
 export type Trip = Tables["trips"]["Row"];
 export type TripItem = Tables["trip_items"]["Row"];
 export type TripExpense = Tables["trip_expenses"]["Row"];
@@ -48,6 +50,9 @@ export const qk = {
   projects: ["projects"] as const,
   personalDates: ["personal_dates"] as const,
   vault: ["vault_entries"] as const,
+  vaultChildren: (parentId: string) => ["vault_entries", "children", parentId] as const,
+  vaultTags: ["vault_tags"] as const,
+  vaultReminders: ["vault_reminders"] as const,
   trips: ["trips"] as const,
   tripItems: (tripId: string) => ["trip_items", tripId] as const,
   tripExpenses: (tripId: string) => ["trip_expenses", tripId] as const,
@@ -1357,10 +1362,18 @@ export function useUpsertVaultEntry() {
         .select()
         .single();
       if (error) throw error;
+      // Seed reusable tag vocabulary — non-blocking on failure.
+      const tags = (input.tags ?? []).map((t) => t.trim().toLowerCase()).filter(Boolean);
+      if (tags.length) {
+        await supabase
+          .from("vault_tags")
+          .upsert(tags.map((name) => ({ user_id, name })), { onConflict: "user_id,name" });
+      }
       return data as VaultEntry;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.vault });
+      qc.invalidateQueries({ queryKey: qk.vaultTags });
       toast.success("Saved to Vault");
     },
     onError: (e: Error) => toast.error(e.message),
@@ -1531,6 +1544,134 @@ export function useDeleteTripExpense() {
     },
     onSuccess: (trip_id) => {
       qc.invalidateQueries({ queryKey: qk.tripExpenses(trip_id) });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Vault: tags ----------
+export function useVaultTags() {
+  return useQuery({
+    queryKey: qk.vaultTags,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vault_tags").select("*").order("name", { ascending: true });
+      if (error) throw error;
+      return data as VaultTag[];
+    },
+  });
+}
+
+// ---------- Vault: children ----------
+export function useVaultChildren(parentId: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.vaultChildren(parentId ?? "none"),
+    enabled: !!parentId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vault_entries").select("*")
+        .eq("parent_id", parentId!).eq("is_archived", false)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data as VaultEntry[];
+    },
+  });
+}
+
+// ---------- Vault: reminders ----------
+export function useVaultReminders(entryId?: string) {
+  return useQuery({
+    queryKey: entryId ? [...qk.vaultReminders, entryId] : qk.vaultReminders,
+    queryFn: async () => {
+      let q = supabase.from("vault_reminders").select("*").order("next_fire_on", { ascending: true });
+      if (entryId) q = q.eq("entry_id", entryId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data as VaultReminder[];
+    },
+  });
+}
+
+/**
+ * Compute the next fire date from a source date (YYYY-MM-DD) minus lead_days.
+ * If the fire date has already passed, roll forward by `repeat` until it's today or later.
+ */
+export function computeNextFireOn(
+  sourceDate: string | null | undefined,
+  leadDays: number,
+  repeat: "none" | "yearly" | "monthly",
+): string | null {
+  if (!sourceDate) return null;
+  const src = new Date(sourceDate + "T00:00:00");
+  if (Number.isNaN(src.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const roll = (d: Date) => {
+    if (repeat === "yearly") d.setFullYear(d.getFullYear() + 1);
+    else if (repeat === "monthly") d.setMonth(d.getMonth() + 1);
+    return d;
+  };
+
+  let fire = new Date(src);
+  fire.setDate(fire.getDate() - leadDays);
+  let source = new Date(src);
+  while (fire < today && repeat !== "none") {
+    source = roll(source);
+    fire = new Date(source);
+    fire.setDate(fire.getDate() - leadDays);
+  }
+  return fire.toISOString().slice(0, 10);
+}
+
+export function useUpsertVaultReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      input: Partial<VaultReminder> & {
+        entry_id: string;
+        label: string;
+        field_key: string;
+        source_date: string | null;
+      },
+    ) => {
+      const user_id = await currentUserId();
+      const {
+        source_date,
+        lead_days = 30,
+        repeat = "none",
+        trigger_kind = "date",
+        active = true,
+        ...rest
+      } = input;
+      const next_fire_on = computeNextFireOn(
+        source_date ?? null,
+        lead_days,
+        (repeat ?? "none") as "none" | "yearly" | "monthly",
+      );
+      const payload = { ...rest, user_id, lead_days, repeat, trigger_kind, active, next_fire_on };
+      const { data, error } = await supabase
+        .from("vault_reminders").upsert(payload).select().single();
+      if (error) throw error;
+      return data as VaultReminder;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.vaultReminders });
+      toast.success("Reminder saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteVaultReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("vault_reminders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.vaultReminders });
     },
     onError: (e: Error) => toast.error(e.message),
   });
