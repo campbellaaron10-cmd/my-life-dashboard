@@ -19,7 +19,7 @@ import { TripsMap, type MapPin as MP } from "@/components/trips/TripsMap";
 import { PlaceAutocomplete, type PickedPlace } from "@/components/trips/PlaceAutocomplete";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/_authenticated/trips")({
+export const Route = createFileRoute("/_authenticated/trips/")({
   head: () => ({
     meta: [
       { title: "Trips — Atlas" },
