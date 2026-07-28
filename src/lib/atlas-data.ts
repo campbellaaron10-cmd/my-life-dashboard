@@ -27,6 +27,14 @@ export type VaultReminder = Tables["vault_reminders"]["Row"];
 export type Trip = Tables["trips"]["Row"];
 export type TripItem = Tables["trip_items"]["Row"];
 export type TripExpense = Tables["trip_expenses"]["Row"];
+export type Place = Tables["places"]["Row"];
+export type BucketItem = Tables["bucket_list_items"]["Row"];
+export type TripPlace = Tables["trip_places"]["Row"];
+export type TripFlight = Tables["trip_flights"]["Row"];
+export type TripPackingItem = Tables["trip_packing_items"]["Row"];
+export type TripPhoto = Tables["trip_photos"]["Row"];
+export type TripTraveler = Tables["trip_travelers"]["Row"];
+export type TripBudgetAllocation = Tables["trip_budget_allocations"]["Row"];
 
 export type RecurrenceRule = {
   every: number;
@@ -1663,16 +1671,312 @@ export function useUpsertVaultReminder() {
   });
 }
 
-export function useDeleteVaultReminder() {
+// ============================================================
+// Places, Bucket List, Trip children (v2 architecture)
+// ============================================================
+
+export const tripsQk = {
+  places: ["places"] as const,
+  place: (id: string) => ["places", id] as const,
+  bucket: ["bucket_list_items"] as const,
+  tripPlaces: (tripId: string) => ["trip_places", tripId] as const,
+  tripFlights: (tripId: string) => ["trip_flights", tripId] as const,
+  tripPacking: (tripId: string) => ["trip_packing_items", tripId] as const,
+  tripPhotos: (tripId: string) => ["trip_photos", tripId] as const,
+  tripTravelers: (tripId: string) => ["trip_travelers", tripId] as const,
+  tripAllocations: (tripId: string) => ["trip_budget_allocations", tripId] as const,
+  bucketPlaces: (bucketId: string) => ["bucket_item_places", bucketId] as const,
+};
+
+// ---------- Places ----------
+export function usePlaces() {
+  return useQuery({
+    queryKey: tripsQk.places,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("places").select("*").eq("is_archived", false)
+        .order("name", { ascending: true });
+      if (error) throw error;
+      return data as Place[];
+    },
+  });
+}
+export function useUpsertPlace() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("vault_reminders").delete().eq("id", id);
+    mutationFn: async (input: Partial<Place> & { name: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("places").upsert({ ...input, user_id }).select().single();
       if (error) throw error;
+      return data as Place;
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.vaultReminders });
+      qc.invalidateQueries({ queryKey: tripsQk.places });
+      toast.success("Place saved");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 }
+export function useDeletePlace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("places").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: tripsQk.places }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Bucket List ----------
+export function useBucketList() {
+  return useQuery({
+    queryKey: tripsQk.bucket,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bucket_list_items").select("*").eq("is_archived", false)
+        .order("sort_order").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as BucketItem[];
+    },
+  });
+}
+export function useUpsertBucket() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<BucketItem> & { title: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("bucket_list_items").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as BucketItem;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tripsQk.bucket });
+      toast.success("Bucket item saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+export function useDeleteBucket() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("bucket_list_items").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: tripsQk.bucket }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Trip <-> Place join ----------
+export function useTripPlaces(tripId: string | undefined) {
+  return useQuery({
+    queryKey: tripId ? tripsQk.tripPlaces(tripId) : ["trip_places", "none"],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_places").select("*, place:places(*)").eq("trip_id", tripId!)
+        .order("sort_order");
+      if (error) throw error;
+      return data as (TripPlace & { place: Place | null })[];
+    },
+  });
+}
+export function useUpsertTripPlace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<TripPlace> & { trip_id: string; place_id: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("trip_places").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as TripPlace;
+    },
+    onSuccess: (row) => qc.invalidateQueries({ queryKey: tripsQk.tripPlaces(row.trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+export function useDeleteTripPlace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, trip_id }: { id: string; trip_id: string }) => {
+      const { error } = await supabase.from("trip_places").delete().eq("id", id);
+      if (error) throw error;
+      return trip_id;
+    },
+    onSuccess: (trip_id) => qc.invalidateQueries({ queryKey: tripsQk.tripPlaces(trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Flights ----------
+export function useTripFlights(tripId: string | undefined) {
+  return useQuery({
+    queryKey: tripId ? tripsQk.tripFlights(tripId) : ["trip_flights", "none"],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_flights").select("*").eq("trip_id", tripId!)
+        .order("depart_at", { ascending: true, nullsFirst: false });
+      if (error) throw error;
+      return data as TripFlight[];
+    },
+  });
+}
+export function useUpsertTripFlight() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<TripFlight> & { trip_id: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("trip_flights").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as TripFlight;
+    },
+    onSuccess: (row) => qc.invalidateQueries({ queryKey: tripsQk.tripFlights(row.trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+export function useDeleteTripFlight() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, trip_id }: { id: string; trip_id: string }) => {
+      const { error } = await supabase.from("trip_flights").delete().eq("id", id);
+      if (error) throw error;
+      return trip_id;
+    },
+    onSuccess: (trip_id) => qc.invalidateQueries({ queryKey: tripsQk.tripFlights(trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Packing ----------
+export function useTripPacking(tripId: string | undefined) {
+  return useQuery({
+    queryKey: tripId ? tripsQk.tripPacking(tripId) : ["trip_packing_items", "none"],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_packing_items").select("*").eq("trip_id", tripId!)
+        .order("category", { ascending: true, nullsFirst: true })
+        .order("sort_order");
+      if (error) throw error;
+      return data as TripPackingItem[];
+    },
+  });
+}
+export function useUpsertPacking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<TripPackingItem> & { trip_id: string; name: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("trip_packing_items").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as TripPackingItem;
+    },
+    onSuccess: (row) => qc.invalidateQueries({ queryKey: tripsQk.tripPacking(row.trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+export function useDeletePacking() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, trip_id }: { id: string; trip_id: string }) => {
+      const { error } = await supabase.from("trip_packing_items").delete().eq("id", id);
+      if (error) throw error;
+      return trip_id;
+    },
+    onSuccess: (trip_id) => qc.invalidateQueries({ queryKey: tripsQk.tripPacking(trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Photos ----------
+export function useTripPhotos(tripId: string | undefined) {
+  return useQuery({
+    queryKey: tripId ? tripsQk.tripPhotos(tripId) : ["trip_photos", "none"],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_photos").select("*").eq("trip_id", tripId!)
+        .order("taken_on", { ascending: false, nullsFirst: false })
+        .order("sort_order");
+      if (error) throw error;
+      return data as TripPhoto[];
+    },
+  });
+}
+export function useUpsertPhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<TripPhoto> & { trip_id: string; url: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("trip_photos").upsert({ ...input, user_id }).select().single();
+      if (error) throw error;
+      return data as TripPhoto;
+    },
+    onSuccess: (row) => qc.invalidateQueries({ queryKey: tripsQk.tripPhotos(row.trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+export function useDeletePhoto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, trip_id }: { id: string; trip_id: string }) => {
+      const { error } = await supabase.from("trip_photos").delete().eq("id", id);
+      if (error) throw error;
+      return trip_id;
+    },
+    onSuccess: (trip_id) => qc.invalidateQueries({ queryKey: tripsQk.tripPhotos(trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+// ---------- Budget allocations ----------
+export function useTripAllocations(tripId: string | undefined) {
+  return useQuery({
+    queryKey: tripId ? tripsQk.tripAllocations(tripId) : ["trip_budget_allocations", "none"],
+    enabled: !!tripId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trip_budget_allocations").select("*").eq("trip_id", tripId!)
+        .order("sort_order");
+      if (error) throw error;
+      return data as TripBudgetAllocation[];
+    },
+  });
+}
+export function useUpsertAllocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Partial<TripBudgetAllocation> & { trip_id: string; category: string }) => {
+      const user_id = await currentUserId();
+      const { data, error } = await supabase
+        .from("trip_budget_allocations").upsert({ ...input, user_id }, { onConflict: "trip_id,category" })
+        .select().single();
+      if (error) throw error;
+      return data as TripBudgetAllocation;
+    },
+    onSuccess: (row) => qc.invalidateQueries({ queryKey: tripsQk.tripAllocations(row.trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+export function useDeleteAllocation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, trip_id }: { id: string; trip_id: string }) => {
+      const { error } = await supabase.from("trip_budget_allocations").delete().eq("id", id);
+      if (error) throw error;
+      return trip_id;
+    },
+    onSuccess: (trip_id) => qc.invalidateQueries({ queryKey: tripsQk.tripAllocations(trip_id) }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
