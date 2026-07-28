@@ -1,7 +1,8 @@
 // Built-in Vault templates. Each defines the structured fields for an entry.
+// Templates control HOW information is captured. They do not control how it is organized —
+// that job belongs to `area` (life-area sidebar).
 import {
   Car,
-  Tent,
   Home,
   FileText,
   Contact,
@@ -21,25 +22,65 @@ export type VaultFieldDef = {
   hint?: string;
 };
 
+export type VaultArea =
+  | "home" | "vehicles" | "travel" | "finance" | "outdoor" | "reference" | "unfiled";
+
+export const VAULT_AREAS: { key: VaultArea; label: string; description: string }[] = [
+  { key: "home",       label: "Home",       description: "Appliances, filters, paint codes, providers." },
+  { key: "vehicles",   label: "Vehicles",   description: "Cars, campers, boats — one page each." },
+  { key: "travel",     label: "Travel",     description: "Passports, loyalty, travel documents." },
+  { key: "finance",    label: "Finance",    description: "Policies, accounts, tax records." },
+  { key: "outdoor",    label: "Outdoor",    description: "Camping, hiking, gear loadouts." },
+  { key: "reference",  label: "Reference",  description: "Contacts, guides, notes." },
+  { key: "unfiled",    label: "Unfiled",    description: "Temporary inbox — pick an area to file it." },
+];
+
 export type VaultTemplate = {
   key: string;
   label: string;
   plural: string;
   icon: LucideIcon;
-  accent: string; // tailwind color class fragment used for tinting
+  accent: string;
   description: string;
+  defaultArea: VaultArea;
+  /** If true, the "Attach to an asset" picker is offered by default. */
+  attachByDefault?: boolean;
   fields: VaultFieldDef[];
   titleHint?: string;
 };
 
 export const VAULT_TEMPLATES: VaultTemplate[] = [
   {
+    key: "note",
+    label: "Note",
+    plural: "Notes",
+    icon: StickyNote,
+    accent: "text-slate-300",
+    description: "Freeform reference. The safest first stop.",
+    defaultArea: "reference",
+    fields: [],
+  },
+  {
+    key: "recipe_note", // legacy value; UI label is "Guide"
+    label: "Guide",
+    plural: "Guides",
+    icon: Wrench,
+    accent: "text-orange-300",
+    description: "Procedures and repeatable routines — oil change, winterizing, deployment.",
+    defaultArea: "reference",
+    fields: [
+      { key: "trigger", label: "When to use", type: "text" },
+      { key: "steps", label: "Steps", type: "list" },
+    ],
+  },
+  {
     key: "vehicle",
     label: "Vehicle",
     plural: "Vehicles",
     icon: Car,
     accent: "text-sky-300",
-    description: "Registration, VIN, service log, and maintenance intervals.",
+    description: "One page per vehicle. Attach warranties, docs, and service notes.",
+    defaultArea: "vehicles",
     titleHint: "e.g. 2019 Toyota 4Runner",
     fields: [
       { key: "make", label: "Make", type: "text" },
@@ -56,31 +97,14 @@ export const VAULT_TEMPLATES: VaultTemplate[] = [
     ],
   },
   {
-    key: "camping",
-    label: "Camping Kit",
-    plural: "Camping",
-    icon: Tent,
-    accent: "text-emerald-300",
-    description: "Loadouts, gear checklists, and campsite intel.",
-    titleHint: "e.g. Weekend loadout · Cades Cove",
-    fields: [
-      { key: "location", label: "Location", type: "text" },
-      { key: "season", label: "Season", type: "text", placeholder: "Spring / Summer / Fall / Winter" },
-      { key: "shelter", label: "Shelter", type: "text" },
-      { key: "sleep_system", label: "Sleep system", type: "text" },
-      { key: "cook_system", label: "Cook system", type: "text" },
-      { key: "checklist", label: "Checklist", type: "list", hint: "One item per line" },
-      { key: "reservations_url", label: "Reservation link", type: "url" },
-    ],
-  },
-  {
     key: "home",
-    label: "Home",
-    plural: "Home",
+    label: "Home Asset",
+    plural: "Home Assets",
     icon: Home,
     accent: "text-amber-300",
-    description: "Appliances, paint codes, filter sizes, and provider info.",
-    titleHint: "e.g. HVAC · Main house",
+    description: "Appliances, HVAC, paint codes, filters. Warranty & manual attach here.",
+    defaultArea: "home",
+    titleHint: "e.g. LG Refrigerator · Kitchen",
     fields: [
       { key: "category", label: "Category", type: "text", placeholder: "Appliance / Utility / Room / Provider" },
       { key: "make", label: "Make / brand", type: "text" },
@@ -94,12 +118,29 @@ export const VAULT_TEMPLATES: VaultTemplate[] = [
     ],
   },
   {
+    key: "contact",
+    label: "Contact",
+    plural: "Contacts",
+    icon: Contact,
+    accent: "text-rose-300",
+    description: "People and vendors you actually use.",
+    defaultArea: "reference",
+    fields: [
+      { key: "role", label: "Role", type: "text", placeholder: "Plumber, doctor, mechanic..." },
+      { key: "phone", label: "Phone", type: "text" },
+      { key: "email", label: "Email", type: "text" },
+      { key: "address", label: "Address", type: "text" },
+    ],
+  },
+  {
     key: "document",
     label: "Document",
     plural: "Documents",
     icon: FileText,
     accent: "text-violet-300",
-    description: "IDs, licenses, and reference numbers.",
+    description: "Passports, registrations, policies. Attaches to an asset by default.",
+    defaultArea: "reference",
+    attachByDefault: true,
     titleHint: "e.g. Passport",
     fields: [
       { key: "kind", label: "Type", type: "text", placeholder: "Passport / License / SSN card" },
@@ -116,7 +157,9 @@ export const VAULT_TEMPLATES: VaultTemplate[] = [
     plural: "Warranties",
     icon: Shield,
     accent: "text-cyan-300",
-    description: "Track coverage windows on purchases.",
+    description: "Coverage window on a purchase. Attaches to an asset by default.",
+    defaultArea: "home",
+    attachByDefault: true,
     titleHint: "e.g. LG Refrigerator warranty",
     fields: [
       { key: "product", label: "Product", type: "text" },
@@ -127,42 +170,12 @@ export const VAULT_TEMPLATES: VaultTemplate[] = [
       { key: "claim_phone", label: "Claim phone", type: "text" },
     ],
   },
-  {
-    key: "contact",
-    label: "Contact",
-    plural: "Contacts",
-    icon: Contact,
-    accent: "text-rose-300",
-    description: "People and vendors you actually use.",
-    fields: [
-      { key: "role", label: "Role", type: "text", placeholder: "Plumber, doctor, mechanic..." },
-      { key: "phone", label: "Phone", type: "text" },
-      { key: "email", label: "Email", type: "text" },
-      { key: "address", label: "Address", type: "text" },
-    ],
-  },
-  {
-    key: "recipe_note",
-    label: "Playbook",
-    plural: "Playbooks",
-    icon: Wrench,
-    accent: "text-orange-300",
-    description: "How-to guides, procedures, and repeatable routines.",
-    fields: [
-      { key: "trigger", label: "When to use", type: "text" },
-      { key: "steps", label: "Steps", type: "list" },
-    ],
-  },
-  {
-    key: "note",
-    label: "Note",
-    plural: "Notes",
-    icon: StickyNote,
-    accent: "text-slate-300",
-    description: "Freeform reference notes.",
-    fields: [],
-  },
 ];
 
 export const templateByKey = (k: string) =>
-  VAULT_TEMPLATES.find((t) => t.key === k) ?? VAULT_TEMPLATES[VAULT_TEMPLATES.length - 1];
+  VAULT_TEMPLATES.find((t) => t.key === k) ?? VAULT_TEMPLATES[0];
+
+/** All date-typed fields on a template — used by the reminder editor. */
+export function dateFieldsOf(template: VaultTemplate) {
+  return template.fields.filter((f) => f.type === "date");
+}
