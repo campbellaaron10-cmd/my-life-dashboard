@@ -21,6 +21,7 @@ import { Route as AuthenticatedPantryRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMoneyRouteImport } from './routes/_authenticated/money'
 import { Route as AuthenticatedFoodsRouteImport } from './routes/_authenticated/foods'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedTripsIndexRouteImport } from './routes/_authenticated/trips.index'
 import { Route as AuthenticatedTripsPlacesRouteImport } from './routes/_authenticated/trips.places'
 import { Route as AuthenticatedTripsBucketListRouteImport } from './routes/_authenticated/trips.bucket-list'
 import { Route as AuthenticatedTripsTripIdRouteImport } from './routes/_authenticated/trips.$tripId'
@@ -85,6 +86,11 @@ const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTripsIndexRoute = AuthenticatedTripsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthenticatedTripsRoute,
+} as any)
 const AuthenticatedTripsPlacesRoute =
   AuthenticatedTripsPlacesRouteImport.update({
     id: '/places',
@@ -125,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/trips/bucket-list': typeof AuthenticatedTripsBucketListRoute
   '/trips/places': typeof AuthenticatedTripsPlacesRoute
+  '/trips/': typeof AuthenticatedTripsIndexRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRoutesByTo {
@@ -135,13 +142,13 @@ export interface FileRoutesByTo {
   '/pantry': typeof AuthenticatedPantryRoute
   '/recipes': typeof AuthenticatedRecipesRoute
   '/tasks': typeof AuthenticatedTasksRoute
-  '/trips': typeof AuthenticatedTripsRouteWithChildren
   '/vault': typeof AuthenticatedVaultRoute
   '/weather': typeof AuthenticatedWeatherRoute
   '/': typeof AuthenticatedIndexRoute
   '/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/trips/bucket-list': typeof AuthenticatedTripsBucketListRoute
   '/trips/places': typeof AuthenticatedTripsPlacesRoute
+  '/trips': typeof AuthenticatedTripsIndexRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRoutesById {
@@ -161,6 +168,7 @@ export interface FileRoutesById {
   '/_authenticated/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/_authenticated/trips/bucket-list': typeof AuthenticatedTripsBucketListRoute
   '/_authenticated/trips/places': typeof AuthenticatedTripsPlacesRoute
+  '/_authenticated/trips/': typeof AuthenticatedTripsIndexRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRouteTypes {
@@ -180,6 +188,7 @@ export interface FileRouteTypes {
     | '/trips/$tripId'
     | '/trips/bucket-list'
     | '/trips/places'
+    | '/trips/'
     | '/api/public/hooks/process-vault-reminders'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -190,13 +199,13 @@ export interface FileRouteTypes {
     | '/pantry'
     | '/recipes'
     | '/tasks'
-    | '/trips'
     | '/vault'
     | '/weather'
     | '/'
     | '/trips/$tripId'
     | '/trips/bucket-list'
     | '/trips/places'
+    | '/trips'
     | '/api/public/hooks/process-vault-reminders'
   id:
     | '__root__'
@@ -215,6 +224,7 @@ export interface FileRouteTypes {
     | '/_authenticated/trips/$tripId'
     | '/_authenticated/trips/bucket-list'
     | '/_authenticated/trips/places'
+    | '/_authenticated/trips/'
     | '/api/public/hooks/process-vault-reminders'
   fileRoutesById: FileRoutesById
 }
@@ -310,6 +320,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/trips/': {
+      id: '/_authenticated/trips/'
+      path: '/'
+      fullPath: '/trips/'
+      preLoaderRoute: typeof AuthenticatedTripsIndexRouteImport
+      parentRoute: typeof AuthenticatedTripsRoute
+    }
     '/_authenticated/trips/places': {
       id: '/_authenticated/trips/places'
       path: '/places'
@@ -345,12 +362,14 @@ interface AuthenticatedTripsRouteChildren {
   AuthenticatedTripsTripIdRoute: typeof AuthenticatedTripsTripIdRoute
   AuthenticatedTripsBucketListRoute: typeof AuthenticatedTripsBucketListRoute
   AuthenticatedTripsPlacesRoute: typeof AuthenticatedTripsPlacesRoute
+  AuthenticatedTripsIndexRoute: typeof AuthenticatedTripsIndexRoute
 }
 
 const AuthenticatedTripsRouteChildren: AuthenticatedTripsRouteChildren = {
   AuthenticatedTripsTripIdRoute: AuthenticatedTripsTripIdRoute,
   AuthenticatedTripsBucketListRoute: AuthenticatedTripsBucketListRoute,
   AuthenticatedTripsPlacesRoute: AuthenticatedTripsPlacesRoute,
+  AuthenticatedTripsIndexRoute: AuthenticatedTripsIndexRoute,
 }
 
 const AuthenticatedTripsRouteWithChildren =
