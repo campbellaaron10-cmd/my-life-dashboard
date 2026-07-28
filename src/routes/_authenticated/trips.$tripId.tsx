@@ -27,6 +27,7 @@ import {
   usePlaces, useUpsertPlace,
   type Trip,
 } from "@/lib/atlas-data";
+import { PlaceAutocomplete, type PickedPlace } from "@/components/trips/PlaceAutocomplete";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -76,9 +77,18 @@ function TripWorkspace() {
 }
 
 /* ---------- Header ---------- */
+function fmtHeaderDates(a: string | null, b: string | null) {
+  const f = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  if (!a && !b) return "";
+  if (a && b) return a === b ? ` · ${f(a)}` : ` · ${f(a)} — ${f(b)}`;
+  return ` · ${f((a ?? b)!)}`;
+}
+
 function TripHeader({ trip, onDeleted }: { trip: Trip; onDeleted: () => void }) {
   const upsert = useUpsertTrip();
   const del = useDeleteTrip();
+  const upsertPlace = useUpsertPlace();
+  const places = usePlaces();
   const [edit, setEdit] = useState(false);
   const [name, setName] = useState(trip.name);
   const [start, setStart] = useState(trip.start_date ?? "");
@@ -86,15 +96,44 @@ function TripHeader({ trip, onDeleted }: { trip: Trip; onDeleted: () => void }) 
   const [status, setStatus] = useState(trip.status);
   const [cover, setCover] = useState(trip.cover_url ?? "");
   const [destination, setDestination] = useState((trip as any).destination_text ?? trip.destination ?? "");
+  const [picked, setPicked] = useState<PickedPlace | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  const destPlace = (trip as any).destination_place_id
+    ? places.data?.find((p) => p.id === (trip as any).destination_place_id)
+    : null;
 
   async function save() {
+    let destinationPlaceId: string | null | undefined = undefined;
+    if (picked) {
+      const place = await upsertPlace.mutateAsync({
+        name: picked.name,
+        category: "destination",
+        google_place_id: picked.google_place_id,
+        lat: picked.lat as any,
+        lng: picked.lng as any,
+        address: picked.address,
+        maps_url: picked.maps_url,
+        status: "want",
+      } as any);
+      destinationPlaceId = place.id;
+    } else if (!destination.trim()) {
+      destinationPlaceId = null;
+    }
     await upsert.mutateAsync({
       id: trip.id, name, start_date: start || null, end_date: end || null,
       status, cover_url: cover || null,
       destination: destination || null, destination_text: destination || null,
+      ...(destinationPlaceId !== undefined ? { destination_place_id: destinationPlaceId } : {}),
     } as any);
+    setImgFailed(false);
+    setPicked(null);
     setEdit(false);
   }
+
+  const mapsHref = destPlace?.maps_url
+    ?? (destPlace?.google_place_id ? `https://www.google.com/maps/place/?q=place_id:${destPlace.google_place_id}` : null)
+    ?? (destPlace?.lat != null && destPlace?.lng != null ? `https://www.google.com/maps/search/?api=1&query=${destPlace.lat},${destPlace.lng}` : null);
 
   return (
     <div>
@@ -103,26 +142,39 @@ function TripHeader({ trip, onDeleted }: { trip: Trip; onDeleted: () => void }) 
           <ArrowLeft className="size-3.5" /> Trips
         </Link>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setEdit((v) => !v)}>{edit ? "Cancel" : "Edit"}</Button>
-          {edit && <Button size="sm" onClick={save}>Save</Button>}
-          {edit && (
-            <Button variant="ghost" size="sm" className="text-rose-300 hover:text-rose-400"
-              onClick={async () => {
-                if (!confirm(`Delete "${trip.name}"?`)) return;
-                await del.mutateAsync(trip.id);
-                onDeleted();
-              }}>
-              <Trash2 className="size-4" />
-            </Button>
+          {mapsHref && (
+            <a href={mapsHref} target="_blank" rel="noreferrer">
+              <Button variant="outline" size="sm"><ExternalLink className="mr-2 size-4" /> Open in Google Maps</Button>
+            </a>
           )}
+          <Button variant="ghost" size="sm" onClick={() => setEdit((v) => !v)}>{edit ? "Cancel" : "Edit"}</Button>
+          {edit && <Button size="sm" onClick={save} disabled={upsert.isPending}>Save</Button>}
+          <Button variant="ghost" size="sm" className="text-rose-300 hover:text-rose-400"
+            onClick={async () => {
+              if (!confirm(`Delete "${trip.name}"? This cannot be undone.`)) return;
+              await del.mutateAsync(trip.id);
+              onDeleted();
+            }}>
+            <Trash2 className="size-4" />
+          </Button>
         </div>
       </div>
       <GlassCard className="relative overflow-hidden p-0">
         <div className="relative h-48 w-full overflow-hidden">
-          {trip.cover_url ? (
-            <img src={trip.cover_url} alt="" className="size-full object-cover" />
+          {trip.cover_url && !imgFailed ? (
+            <img
+              src={trip.cover_url}
+              alt=""
+              className="size-full object-cover"
+              onError={() => setImgFailed(true)}
+              referrerPolicy="no-referrer"
+            />
           ) : (
-            <div className="size-full bg-gradient-to-br from-primary/30 via-accent/10 to-background" />
+            <div className="relative size-full overflow-hidden">
+              <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_20%_10%,rgba(96,165,250,0.35),transparent_60%),radial-gradient(120%_80%_at_80%_90%,rgba(167,139,250,0.3),transparent_60%),linear-gradient(135deg,#0b1220,#111827)]" />
+              <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay"
+                style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)", backgroundSize: "18px 18px" }} />
+            </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
           <div className="absolute inset-x-0 bottom-0 p-6">
@@ -130,29 +182,42 @@ function TripHeader({ trip, onDeleted }: { trip: Trip; onDeleted: () => void }) 
               <div className="space-y-2">
                 <Input value={name} onChange={(e) => setName(e.target.value)} className="max-w-xl bg-black/40 text-2xl font-semibold" />
                 <div className="grid max-w-2xl grid-cols-2 gap-3 md:grid-cols-4">
-                  <Input placeholder="Destination" value={destination} onChange={(e) => setDestination(e.target.value)} className="bg-black/40" />
+                  <div className="md:col-span-2">
+                    <PlaceAutocomplete
+                      value={destination}
+                      onChange={(v) => setDestination(v)}
+                      onClear={() => setPicked(null)}
+                      onPick={(p) => { setDestination(p.name); setPicked(p); }}
+                      verified={!!picked}
+                      placeholder="Destination"
+                    />
+                  </div>
                   <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="bg-black/40" />
                   <Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="bg-black/40" />
-                  <Select value={status} onValueChange={(v) => setStatus(v as Trip["status"])}>
-                    <SelectTrigger className="bg-black/40"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="planning">Planning</SelectItem>
-                      <SelectItem value="upcoming">Upcoming</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="md:col-span-4">
+                    <Select value={status} onValueChange={(v) => setStatus(v as Trip["status"])}>
+                      <SelectTrigger className="max-w-xs bg-black/40"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="planning">Planning</SelectItem>
+                        <SelectItem value="upcoming">Upcoming</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <Input placeholder="Cover image URL" value={cover} onChange={(e) => setCover(e.target.value)} className="max-w-2xl bg-black/40" />
+                <Input placeholder="Cover image URL (direct .jpg / .png / .webp)" value={cover} onChange={(e) => { setCover(e.target.value); setImgFailed(false); }} className="max-w-2xl bg-black/40" />
+                {trip.cover_url && imgFailed && (
+                  <p className="text-[11px] text-rose-300">Cover image failed to load. Most likely a page URL, hotlink block, or referrer restriction. Use a direct image URL.</p>
+                )}
               </div>
             ) : (
               <>
                 <Badge className="mb-2 text-[10px] font-mono uppercase tracking-widest">{trip.status}</Badge>
                 <h1 className="text-3xl font-semibold tracking-tight">{trip.name}</h1>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {(trip as any).destination_text ?? trip.destination ?? "—"}
-                  {trip.start_date && ` · ${trip.start_date}`}{trip.end_date && ` — ${trip.end_date}`}
+                  {(trip as any).destination_text ?? trip.destination ?? "—"}{fmtHeaderDates(trip.start_date, trip.end_date)}
                 </p>
               </>
             )}

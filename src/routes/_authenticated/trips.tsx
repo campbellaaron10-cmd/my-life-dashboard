@@ -10,12 +10,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  useTrips, useUpsertTrip, usePlaces, useBucketList, type Trip,
+  useTrips, useUpsertTrip, usePlaces, useBucketList, useUpsertPlace, type Trip,
 } from "@/lib/atlas-data";
 import { TripsMap, type MapPin as MP } from "@/components/trips/TripsMap";
+import { PlaceAutocomplete, type PickedPlace } from "@/components/trips/PlaceAutocomplete";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/trips")({
@@ -47,8 +48,22 @@ function daysUntil(start: string | null): number | null {
 function fmtDateRange(a: string | null, b: string | null) {
   if (!a && !b) return "Dates TBD";
   const fmt = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  if (a && b) return `${fmt(a)} — ${fmt(b)}`;
+  if (a && b) return a === b ? fmt(a) : `${fmt(a)} — ${fmt(b)}`;
   return fmt((a ?? b)!);
+}
+
+function TripCoverFallback({ label }: { label?: string | null }) {
+  const initial = (label ?? "").trim().charAt(0).toUpperCase() || "•";
+  return (
+    <div className="relative size-full overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_20%_10%,rgba(96,165,250,0.35),transparent_60%),radial-gradient(120%_80%_at_80%_90%,rgba(167,139,250,0.3),transparent_60%),linear-gradient(135deg,#0b1220,#111827)]" />
+      <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay"
+        style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)", backgroundSize: "18px 18px" }} />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="font-mono text-5xl font-semibold text-white/25">{initial}</span>
+      </div>
+    </div>
+  );
 }
 
 function TripsLandingPage() {
@@ -114,21 +129,16 @@ function TripsLandingPage() {
       {/* Map */}
       <GlassCard className="p-3">
         <TripsMap pins={pins} height={440} />
-        {pins.length === 0 && (
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            Add a place with coordinates to start pinning your world.
-          </p>
-        )}
       </GlassCard>
 
       {/* Strips */}
       <div className="grid gap-4 md:grid-cols-3">
-        <NextTripStrip trip={next} />
-        <UpcomingStrip trips={upcoming.slice(0, 4)} />
+        <NextTripStrip trip={next} onNew={() => setDialogOpen(true)} />
+        <UpcomingStrip trips={upcoming.slice(0, 4)} onNew={() => setDialogOpen(true)} />
         <BucketProgressStrip items={bucket.data ?? []} />
       </div>
 
-      {/* Recent past */}
+      {/* Recent past — memories */}
       {past.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground">Memories</h2>
@@ -138,27 +148,37 @@ function TripsLandingPage() {
         </section>
       )}
 
-      {/* All */}
-      {(trips.data ?? []).length > 0 && (
-        <section>
-          <h2 className="mb-3 text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground">All trips</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(trips.data ?? []).map((t) => <TripCard key={t.id} trip={t} />)}
-          </div>
-        </section>
-      )}
+      {/* All (excluding memories shown above) */}
+      {(() => {
+        const memoryIds = new Set(past.slice(0, 6).map((t) => t.id));
+        const rest = (trips.data ?? []).filter((t) => !memoryIds.has(t.id));
+        if (rest.length === 0) return null;
+        return (
+          <section>
+            <h2 className="mb-3 text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground">All trips</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {rest.map((t) => <TripCard key={t.id} trip={t} />)}
+            </div>
+          </section>
+        );
+      })()}
 
       <NewTripDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
   );
 }
 
-function NextTripStrip({ trip }: { trip: Trip | undefined }) {
+function NextTripStrip({ trip, onNew }: { trip: Trip | undefined; onNew: () => void }) {
   if (!trip) {
     return (
-      <GlassCard className="flex min-h-[160px] flex-col justify-center p-5">
-        <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Next trip</p>
-        <p className="mt-2 text-sm text-muted-foreground">Nothing planned. Time to change that.</p>
+      <GlassCard className="flex min-h-[160px] flex-col justify-between p-5">
+        <div>
+          <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Next trip</p>
+          <p className="mt-2 text-sm text-muted-foreground">Nothing planned. Time to change that.</p>
+        </div>
+        <Button size="sm" className="mt-3 self-start" onClick={onNew}>
+          <Plus className="mr-2 size-4" /> Plan a trip
+        </Button>
       </GlassCard>
     );
   }
@@ -166,12 +186,15 @@ function NextTripStrip({ trip }: { trip: Trip | undefined }) {
   return (
     <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="block">
       <GlassCard className="group relative min-h-[160px] overflow-hidden p-5">
-        {trip.cover_url && (
-          <div className="absolute inset-0 opacity-30 transition-opacity group-hover:opacity-40">
-            <img src={trip.cover_url} alt="" className="size-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-          </div>
-        )}
+        <div className="absolute inset-0 opacity-30 transition-opacity group-hover:opacity-40">
+          {trip.cover_url ? (
+            <img src={trip.cover_url} alt="" className="size-full object-cover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+          ) : (
+            <TripCoverFallback label={(trip as any).destination_text ?? trip.destination ?? trip.name} />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        </div>
         <div className="relative">
           <p className="text-xs font-mono uppercase tracking-widest text-primary/80">Next trip</p>
           <h3 className="mt-1 text-xl font-semibold">{trip.name}</h3>
@@ -187,12 +210,18 @@ function NextTripStrip({ trip }: { trip: Trip | undefined }) {
   );
 }
 
-function UpcomingStrip({ trips }: { trips: Trip[] }) {
+function UpcomingStrip({ trips, onNew }: { trips: Trip[]; onNew: () => void }) {
   return (
-    <GlassCard className="min-h-[160px] p-5">
+    <GlassCard className="flex min-h-[160px] flex-col p-5">
       <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Upcoming</p>
       {trips.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">No upcoming trips.</p>
+        <div className="mt-2 flex flex-1 flex-col justify-between">
+          <p className="text-sm text-muted-foreground">No upcoming trips.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={onNew}><Plus className="mr-2 size-4" /> New trip</Button>
+            <Link to="/trips/bucket-list"><Button size="sm" variant="ghost"><Sparkles className="mr-2 size-4" /> Browse bucket list</Button></Link>
+          </div>
+        </div>
       ) : (
         <ul className="mt-3 space-y-2">
           {trips.map((t) => (
@@ -242,14 +271,16 @@ function BucketProgressStrip({ items }: { items: any[] }) {
 function TripCard({ trip }: { trip: Trip }) {
   const d = daysUntil(trip.start_date);
   const s = STATUS_META[trip.status];
+  const label = (trip as any).destination_text ?? trip.destination ?? trip.name;
   return (
     <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="group block">
       <GlassCard className="relative h-full overflow-hidden p-0">
         <div className="relative h-32 w-full overflow-hidden">
           {trip.cover_url ? (
-            <img src={trip.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={trip.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           ) : (
-            <div className="size-full bg-gradient-to-br from-primary/20 via-accent/10 to-background" />
+            <TripCoverFallback label={label} />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
           <div className="absolute left-3 top-3">
@@ -279,21 +310,43 @@ function TripCard({ trip }: { trip: Trip }) {
 
 function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const upsert = useUpsertTrip();
+  const upsertPlace = useUpsertPlace();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [destination, setDestination] = useState("");
+  const [picked, setPicked] = useState<PickedPlace | null>(null);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [type, setType] = useState<string>("leisure");
   const [status, setStatus] = useState<Trip["status"]>("planning");
   const [cover, setCover] = useState("");
 
+  function reset() {
+    setName(""); setDestination(""); setPicked(null);
+    setStart(""); setEnd(""); setType("leisure"); setStatus("planning"); setCover("");
+  }
+
   async function submit() {
     if (!name.trim()) return;
+    let destinationPlaceId: string | null = null;
+    if (picked) {
+      const place = await upsertPlace.mutateAsync({
+        name: picked.name,
+        category: "destination",
+        google_place_id: picked.google_place_id,
+        lat: picked.lat as any,
+        lng: picked.lng as any,
+        address: picked.address,
+        maps_url: picked.maps_url,
+        status: "want",
+      } as any);
+      destinationPlaceId = place.id;
+    }
     const row = await upsert.mutateAsync({
       name: name.trim(),
       destination: destination.trim() || null,
       destination_text: destination.trim() || null,
+      destination_place_id: destinationPlaceId,
       start_date: start || null,
       end_date: end || null,
       status,
@@ -302,14 +355,17 @@ function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
       budget: 0,
     } as any);
     onOpenChange(false);
-    setName(""); setDestination(""); setStart(""); setEnd(""); setType("leisure"); setStatus("planning"); setCover("");
+    reset();
     navigate({ to: "/trips/$tripId", params: { tripId: row.id } });
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset(); }}>
       <DialogContent>
-        <DialogHeader><DialogTitle>New trip</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>New trip</DialogTitle>
+          <DialogDescription>Plan a new destination. Details can be edited later from the trip workspace.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div>
             <Label>Name</Label>
@@ -317,8 +373,19 @@ function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
           </div>
           <div>
             <Label>Destination</Label>
-            <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Reykjavík, Iceland" />
-            <p className="mt-1 text-[11px] text-muted-foreground">Places autocomplete coming — free-text works today.</p>
+            <PlaceAutocomplete
+              value={destination}
+              onChange={(v) => setDestination(v)}
+              onClear={() => setPicked(null)}
+              onPick={(p) => { setDestination(p.name); setPicked(p); }}
+              placeholder="Reykjavík, Iceland"
+              verified={!!picked}
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {picked
+                ? "Verified — this destination will be mapped."
+                : "Type to search Google Places. Free text is allowed but won't appear on the map."}
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
@@ -354,7 +421,8 @@ function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
           </div>
           <div>
             <Label>Cover image URL (optional)</Label>
-            <Input value={cover} onChange={(e) => setCover(e.target.value)} placeholder="https://…" />
+            <Input value={cover} onChange={(e) => setCover(e.target.value)} placeholder="https://direct-image-url.jpg" />
+            <p className="mt-1 text-[11px] text-muted-foreground">Paste a direct image URL (ending in .jpg / .png / .webp). Page URLs or referrer-restricted hosts won't render.</p>
           </div>
         </div>
         <DialogFooter>
