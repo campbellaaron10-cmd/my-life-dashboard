@@ -27,6 +27,7 @@ import {
   usePlaces, useUpsertPlace,
   type Trip,
 } from "@/lib/atlas-data";
+import { PlaceAutocomplete, type PickedPlace } from "@/components/trips/PlaceAutocomplete";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
