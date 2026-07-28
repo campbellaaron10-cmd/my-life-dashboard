@@ -446,7 +446,6 @@ function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
             </div>
           </div>
           <div>
-          <div>
             <Label>Cover image (optional)</Label>
             <CoverUploader value={cover} onChange={setCover} />
             <p className="mt-1 text-[11px] text-muted-foreground">Upload from your device, or paste a direct image URL.</p>
