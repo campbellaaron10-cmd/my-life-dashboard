@@ -10,12 +10,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  useTrips, useUpsertTrip, usePlaces, useBucketList, type Trip,
+  useTrips, useUpsertTrip, usePlaces, useBucketList, useUpsertPlace, type Trip,
 } from "@/lib/atlas-data";
 import { TripsMap, type MapPin as MP } from "@/components/trips/TripsMap";
+import { PlaceAutocomplete, type PickedPlace } from "@/components/trips/PlaceAutocomplete";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/trips")({
