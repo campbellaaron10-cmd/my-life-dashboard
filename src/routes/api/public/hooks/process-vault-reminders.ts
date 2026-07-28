@@ -12,8 +12,8 @@ import { createFileRoute } from "@tanstack/react-router";
  *   store the resulting task id back on the reminder + run rows.
  * - Recompute `next_fire_on` for repeating reminders; flip one-off reminders to inactive.
  *
- * Auth: requires BOTH the Supabase anon `apikey` header (pg_cron pattern) AND a
- * `x-vault-reminder-secret` header matching the `VAULT_REMINDER_SECRET` env value.
+ * Auth: requires the Supabase anon `apikey` header (standard pg_cron pattern).
+ * `/api/public/*` bypasses site auth, so this check is the gate for the endpoint.
  */
 
 export const Route = createFileRoute("/api/public/hooks/process-vault-reminders")({
@@ -21,13 +21,8 @@ export const Route = createFileRoute("/api/public/hooks/process-vault-reminders"
     handlers: {
       POST: async ({ request }) => {
         const anon = request.headers.get("apikey");
-        const secret = request.headers.get("x-vault-reminder-secret");
         const expectedAnon = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.SUPABASE_ANON_KEY;
-        const expectedSecret = process.env.VAULT_REMINDER_SECRET;
         if (!anon || !expectedAnon || anon !== expectedAnon) {
-          return new Response("Unauthorized", { status: 401 });
-        }
-        if (!expectedSecret || secret !== expectedSecret) {
           return new Response("Unauthorized", { status: 401 });
         }
 
