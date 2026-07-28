@@ -21,6 +21,7 @@ import { Route as AuthenticatedPantryRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedMoneyRouteImport } from './routes/_authenticated/money'
 import { Route as AuthenticatedFoodsRouteImport } from './routes/_authenticated/foods'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedTripsPlacesRouteImport } from './routes/_authenticated/trips.places'
 import { Route as AuthenticatedTripsTripIdRouteImport } from './routes/_authenticated/trips.$tripId'
 import { Route as ApiPublicHooksProcessVaultRemindersRouteImport } from './routes/api/public/hooks/process-vault-reminders'
 
@@ -83,6 +84,12 @@ const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTripsPlacesRoute =
+  AuthenticatedTripsPlacesRouteImport.update({
+    id: '/places',
+    path: '/places',
+    getParentRoute: () => AuthenticatedTripsRoute,
+  } as any)
 const AuthenticatedTripsTripIdRoute =
   AuthenticatedTripsTripIdRouteImport.update({
     id: '/$tripId',
@@ -109,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/vault': typeof AuthenticatedVaultRoute
   '/weather': typeof AuthenticatedWeatherRoute
   '/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
+  '/trips/places': typeof AuthenticatedTripsPlacesRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRoutesByTo {
@@ -124,6 +132,7 @@ export interface FileRoutesByTo {
   '/weather': typeof AuthenticatedWeatherRoute
   '/': typeof AuthenticatedIndexRoute
   '/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
+  '/trips/places': typeof AuthenticatedTripsPlacesRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRoutesById {
@@ -141,6 +150,7 @@ export interface FileRoutesById {
   '/_authenticated/weather': typeof AuthenticatedWeatherRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
+  '/_authenticated/trips/places': typeof AuthenticatedTripsPlacesRoute
   '/api/public/hooks/process-vault-reminders': typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 export interface FileRouteTypes {
@@ -158,6 +168,7 @@ export interface FileRouteTypes {
     | '/vault'
     | '/weather'
     | '/trips/$tripId'
+    | '/trips/places'
     | '/api/public/hooks/process-vault-reminders'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -173,6 +184,7 @@ export interface FileRouteTypes {
     | '/weather'
     | '/'
     | '/trips/$tripId'
+    | '/trips/places'
     | '/api/public/hooks/process-vault-reminders'
   id:
     | '__root__'
@@ -189,6 +201,7 @@ export interface FileRouteTypes {
     | '/_authenticated/weather'
     | '/_authenticated/'
     | '/_authenticated/trips/$tripId'
+    | '/_authenticated/trips/places'
     | '/api/public/hooks/process-vault-reminders'
   fileRoutesById: FileRoutesById
 }
@@ -284,6 +297,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/trips/places': {
+      id: '/_authenticated/trips/places'
+      path: '/places'
+      fullPath: '/trips/places'
+      preLoaderRoute: typeof AuthenticatedTripsPlacesRouteImport
+      parentRoute: typeof AuthenticatedTripsRoute
+    }
     '/_authenticated/trips/$tripId': {
       id: '/_authenticated/trips/$tripId'
       path: '/$tripId'
@@ -303,10 +323,12 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedTripsRouteChildren {
   AuthenticatedTripsTripIdRoute: typeof AuthenticatedTripsTripIdRoute
+  AuthenticatedTripsPlacesRoute: typeof AuthenticatedTripsPlacesRoute
 }
 
 const AuthenticatedTripsRouteChildren: AuthenticatedTripsRouteChildren = {
   AuthenticatedTripsTripIdRoute: AuthenticatedTripsTripIdRoute,
+  AuthenticatedTripsPlacesRoute: AuthenticatedTripsPlacesRoute,
 }
 
 const AuthenticatedTripsRouteWithChildren =
