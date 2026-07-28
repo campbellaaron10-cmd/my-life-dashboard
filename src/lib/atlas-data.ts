@@ -1548,3 +1548,131 @@ export function useDeleteTripExpense() {
     onError: (e: Error) => toast.error(e.message),
   });
 }
+
+// ---------- Vault: tags ----------
+export function useVaultTags() {
+  return useQuery({
+    queryKey: qk.vaultTags,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vault_tags").select("*").order("name", { ascending: true });
+      if (error) throw error;
+      return data as VaultTag[];
+    },
+  });
+}
+
+// ---------- Vault: children ----------
+export function useVaultChildren(parentId: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.vaultChildren(parentId ?? "none"),
+    enabled: !!parentId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vault_entries").select("*")
+        .eq("parent_id", parentId!).eq("is_archived", false)
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return data as VaultEntry[];
+    },
+  });
+}
+
+// ---------- Vault: reminders ----------
+export function useVaultReminders(entryId?: string) {
+  return useQuery({
+    queryKey: entryId ? [...qk.vaultReminders, entryId] : qk.vaultReminders,
+    queryFn: async () => {
+      let q = supabase.from("vault_reminders").select("*").order("next_fire_on", { ascending: true });
+      if (entryId) q = q.eq("entry_id", entryId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data as VaultReminder[];
+    },
+  });
+}
+
+/**
+ * Compute the next fire date from a source date (YYYY-MM-DD) minus lead_days.
+ * If the fire date has already passed, roll forward by `repeat` until it's today or later.
+ */
+export function computeNextFireOn(
+  sourceDate: string | null | undefined,
+  leadDays: number,
+  repeat: "none" | "yearly" | "monthly",
+): string | null {
+  if (!sourceDate) return null;
+  const src = new Date(sourceDate + "T00:00:00");
+  if (Number.isNaN(src.getTime())) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const roll = (d: Date) => {
+    if (repeat === "yearly") d.setFullYear(d.getFullYear() + 1);
+    else if (repeat === "monthly") d.setMonth(d.getMonth() + 1);
+    return d;
+  };
+
+  let fire = new Date(src);
+  fire.setDate(fire.getDate() - leadDays);
+  let source = new Date(src);
+  while (fire < today && repeat !== "none") {
+    source = roll(source);
+    fire = new Date(source);
+    fire.setDate(fire.getDate() - leadDays);
+  }
+  return fire.toISOString().slice(0, 10);
+}
+
+export function useUpsertVaultReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      input: Partial<VaultReminder> & {
+        entry_id: string;
+        label: string;
+        field_key: string;
+        source_date: string | null;
+      },
+    ) => {
+      const user_id = await currentUserId();
+      const {
+        source_date,
+        lead_days = 30,
+        repeat = "none",
+        trigger_kind = "date",
+        active = true,
+        ...rest
+      } = input;
+      const next_fire_on = computeNextFireOn(
+        source_date ?? null,
+        lead_days,
+        (repeat ?? "none") as "none" | "yearly" | "monthly",
+      );
+      const payload = { ...rest, user_id, lead_days, repeat, trigger_kind, active, next_fire_on };
+      const { data, error } = await supabase
+        .from("vault_reminders").upsert(payload).select().single();
+      if (error) throw error;
+      return data as VaultReminder;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.vaultReminders });
+      toast.success("Reminder saved");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+export function useDeleteVaultReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("vault_reminders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.vaultReminders });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
