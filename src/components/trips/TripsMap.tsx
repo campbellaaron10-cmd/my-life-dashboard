@@ -203,7 +203,6 @@ function addContinentLabels(map: any, g: any) {
     o.setMap(map);
   }
   map.addListener("zoom_changed", () => {
-    // Trigger redraw of overlays
-    google.maps.event.trigger(map, "bounds_changed");
+    g.event.trigger(map, "bounds_changed");
   });
 }
