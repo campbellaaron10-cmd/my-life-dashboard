@@ -1671,6 +1671,20 @@ export function useUpsertVaultReminder() {
   });
 }
 
+export function useDeleteVaultReminder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("vault_reminders").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.vaultReminders }),
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
+
+
 // ============================================================
 // Places, Bucket List, Trip children (v2 architecture)
 // ============================================================
