@@ -462,3 +462,61 @@ function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
     </Dialog>
   );
 }
+
+function CoverUploader({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFile(file: File) {
+    setUploading(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) throw new Error("Not signed in");
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${uid}/covers/${crypto.randomUUID()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("trip-photos").upload(path, file, {
+        contentType: file.type || "image/jpeg",
+        upsert: false,
+      });
+      if (upErr) throw upErr;
+      const { data: signed, error: signErr } = await supabase.storage
+        .from("trip-photos")
+        .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signErr || !signed) throw signErr ?? new Error("Sign failed");
+      onChange(signed.signedUrl);
+      toast.success("Cover uploaded");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      {value && (
+        <div className="relative overflow-hidden rounded-md border border-white/10">
+          <img src={value} alt="" className="h-32 w-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+        />
+        <Button type="button" size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
+          {uploading ? "Uploading..." : "Upload from device"}
+        </Button>
+        {value && (
+          <Button type="button" size="sm" variant="ghost" onClick={() => onChange("")}>Remove</Button>
+        )}
+      </div>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="…or paste an image URL" />
+    </div>
+  );
+}
