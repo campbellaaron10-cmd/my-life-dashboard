@@ -128,21 +128,16 @@ function TripsLandingPage() {
       {/* Map */}
       <GlassCard className="p-3">
         <TripsMap pins={pins} height={440} />
-        {pins.length === 0 && (
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            Add a place with coordinates to start pinning your world.
-          </p>
-        )}
       </GlassCard>
 
       {/* Strips */}
       <div className="grid gap-4 md:grid-cols-3">
-        <NextTripStrip trip={next} />
-        <UpcomingStrip trips={upcoming.slice(0, 4)} />
+        <NextTripStrip trip={next} onNew={() => setDialogOpen(true)} />
+        <UpcomingStrip trips={upcoming.slice(0, 4)} onNew={() => setDialogOpen(true)} />
         <BucketProgressStrip items={bucket.data ?? []} />
       </div>
 
-      {/* Recent past */}
+      {/* Recent past — memories */}
       {past.length > 0 && (
         <section>
           <h2 className="mb-3 text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground">Memories</h2>
@@ -152,15 +147,20 @@ function TripsLandingPage() {
         </section>
       )}
 
-      {/* All */}
-      {(trips.data ?? []).length > 0 && (
-        <section>
-          <h2 className="mb-3 text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground">All trips</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(trips.data ?? []).map((t) => <TripCard key={t.id} trip={t} />)}
-          </div>
-        </section>
-      )}
+      {/* All (excluding memories shown above) */}
+      {(() => {
+        const memoryIds = new Set(past.slice(0, 6).map((t) => t.id));
+        const rest = (trips.data ?? []).filter((t) => !memoryIds.has(t.id));
+        if (rest.length === 0) return null;
+        return (
+          <section>
+            <h2 className="mb-3 text-xs font-mono uppercase tracking-[0.25em] text-muted-foreground">All trips</h2>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {rest.map((t) => <TripCard key={t.id} trip={t} />)}
+            </div>
+          </section>
+        );
+      })()}
 
       <NewTripDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </div>
