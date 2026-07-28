@@ -1099,14 +1099,18 @@ export type Database = {
       }
       vault_entries: {
         Row: {
+          area: string
+          attachments: Json
           created_at: string
           fields: Json
           id: string
           is_archived: boolean
           is_pinned: boolean
           notes: string | null
+          parent_id: string | null
           related_project_id: string | null
           related_task_ids: string[]
+          related_trip_ids: string[]
           sort_order: number
           subtitle: string | null
           tags: string[]
@@ -1116,14 +1120,18 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          area?: string
+          attachments?: Json
           created_at?: string
           fields?: Json
           id?: string
           is_archived?: boolean
           is_pinned?: boolean
           notes?: string | null
+          parent_id?: string | null
           related_project_id?: string | null
           related_task_ids?: string[]
+          related_trip_ids?: string[]
           sort_order?: number
           subtitle?: string | null
           tags?: string[]
@@ -1133,20 +1141,150 @@ export type Database = {
           user_id: string
         }
         Update: {
+          area?: string
+          attachments?: Json
           created_at?: string
           fields?: Json
           id?: string
           is_archived?: boolean
           is_pinned?: boolean
           notes?: string | null
+          parent_id?: string | null
           related_project_id?: string | null
           related_task_ids?: string[]
+          related_trip_ids?: string[]
           sort_order?: number
           subtitle?: string | null
           tags?: string[]
           template?: string
           title?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_entries_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "vault_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_reminder_runs: {
+        Row: {
+          cycle_key: string
+          ran_at: string
+          reminder_id: string
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          cycle_key: string
+          ran_at?: string
+          reminder_id: string
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          cycle_key?: string
+          ran_at?: string
+          reminder_id?: string
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_reminder_runs_reminder_id_fkey"
+            columns: ["reminder_id"]
+            isOneToOne: false
+            referencedRelation: "vault_reminders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_reminders: {
+        Row: {
+          active: boolean
+          created_at: string
+          entry_id: string
+          field_key: string | null
+          id: string
+          label: string
+          last_generated_cycle: string | null
+          last_generated_task_id: string | null
+          lead_days: number
+          mileage_interval: number | null
+          mileage_last_at: number | null
+          next_fire_on: string | null
+          repeat: string
+          trigger_kind: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          entry_id: string
+          field_key?: string | null
+          id?: string
+          label: string
+          last_generated_cycle?: string | null
+          last_generated_task_id?: string | null
+          lead_days?: number
+          mileage_interval?: number | null
+          mileage_last_at?: number | null
+          next_fire_on?: string | null
+          repeat?: string
+          trigger_kind?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          entry_id?: string
+          field_key?: string | null
+          id?: string
+          label?: string
+          last_generated_cycle?: string | null
+          last_generated_task_id?: string | null
+          lead_days?: number
+          mileage_interval?: number | null
+          mileage_last_at?: number | null
+          next_fire_on?: string | null
+          repeat?: string
+          trigger_kind?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vault_reminders_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "vault_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vault_tags: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
           user_id?: string
         }
         Relationships: []
