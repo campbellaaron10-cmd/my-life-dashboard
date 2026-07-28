@@ -270,14 +270,16 @@ function BucketProgressStrip({ items }: { items: any[] }) {
 function TripCard({ trip }: { trip: Trip }) {
   const d = daysUntil(trip.start_date);
   const s = STATUS_META[trip.status];
+  const label = (trip as any).destination_text ?? trip.destination ?? trip.name;
   return (
     <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="group block">
       <GlassCard className="relative h-full overflow-hidden p-0">
         <div className="relative h-32 w-full overflow-hidden">
           {trip.cover_url ? (
-            <img src={trip.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105" />
+            <img src={trip.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
           ) : (
-            <div className="size-full bg-gradient-to-br from-primary/20 via-accent/10 to-background" />
+            <TripCoverFallback label={label} />
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
           <div className="absolute left-3 top-3">
@@ -307,21 +309,43 @@ function TripCard({ trip }: { trip: Trip }) {
 
 function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
   const upsert = useUpsertTrip();
+  const upsertPlace = useUpsertPlace();
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [destination, setDestination] = useState("");
+  const [picked, setPicked] = useState<PickedPlace | null>(null);
   const [start, setStart] = useState("");
   const [end, setEnd] = useState("");
   const [type, setType] = useState<string>("leisure");
   const [status, setStatus] = useState<Trip["status"]>("planning");
   const [cover, setCover] = useState("");
 
+  function reset() {
+    setName(""); setDestination(""); setPicked(null);
+    setStart(""); setEnd(""); setType("leisure"); setStatus("planning"); setCover("");
+  }
+
   async function submit() {
     if (!name.trim()) return;
+    let destinationPlaceId: string | null = null;
+    if (picked) {
+      const place = await upsertPlace.mutateAsync({
+        name: picked.name,
+        category: "destination",
+        google_place_id: picked.google_place_id,
+        lat: picked.lat as any,
+        lng: picked.lng as any,
+        address: picked.address,
+        maps_url: picked.maps_url,
+        status: "want",
+      } as any);
+      destinationPlaceId = place.id;
+    }
     const row = await upsert.mutateAsync({
       name: name.trim(),
       destination: destination.trim() || null,
       destination_text: destination.trim() || null,
+      destination_place_id: destinationPlaceId,
       start_date: start || null,
       end_date: end || null,
       status,
@@ -330,14 +354,17 @@ function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
       budget: 0,
     } as any);
     onOpenChange(false);
-    setName(""); setDestination(""); setStart(""); setEnd(""); setType("leisure"); setStatus("planning"); setCover("");
+    reset();
     navigate({ to: "/trips/$tripId", params: { tripId: row.id } });
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset(); }}>
       <DialogContent>
-        <DialogHeader><DialogTitle>New trip</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>New trip</DialogTitle>
+          <DialogDescription>Plan a new destination. Details can be edited later from the trip workspace.</DialogDescription>
+        </DialogHeader>
         <div className="space-y-3">
           <div>
             <Label>Name</Label>
@@ -345,8 +372,19 @@ function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
           </div>
           <div>
             <Label>Destination</Label>
-            <Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="Reykjavík, Iceland" />
-            <p className="mt-1 text-[11px] text-muted-foreground">Places autocomplete coming — free-text works today.</p>
+            <PlaceAutocomplete
+              value={destination}
+              onChange={(v) => setDestination(v)}
+              onClear={() => setPicked(null)}
+              onPick={(p) => { setDestination(p.name); setPicked(p); }}
+              placeholder="Reykjavík, Iceland"
+              verified={!!picked}
+            />
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              {picked
+                ? "Verified — this destination will be mapped."
+                : "Type to search Google Places. Free text is allowed but won't appear on the map."}
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Start</Label><Input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></div>
@@ -382,7 +420,8 @@ function NewTripDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v
           </div>
           <div>
             <Label>Cover image URL (optional)</Label>
-            <Input value={cover} onChange={(e) => setCover(e.target.value)} placeholder="https://…" />
+            <Input value={cover} onChange={(e) => setCover(e.target.value)} placeholder="https://direct-image-url.jpg" />
+            <p className="mt-1 text-[11px] text-muted-foreground">Paste a direct image URL (ending in .jpg / .png / .webp). Page URLs or referrer-restricted hosts won't render.</p>
           </div>
         </div>
         <DialogFooter>
