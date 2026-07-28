@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Plus, Plane, MapPin, Sparkles, Compass } from "lucide-react";
+import { Plus, Plane, MapPin, Sparkles, Compass, Pencil } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -273,38 +273,50 @@ function TripCard({ trip }: { trip: Trip }) {
   const s = STATUS_META[trip.status];
   const label = (trip as any).destination_text ?? trip.destination ?? trip.name;
   return (
-    <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="group block">
-      <GlassCard className="relative h-full overflow-hidden p-0">
-        <div className="relative h-32 w-full overflow-hidden">
-          {trip.cover_url ? (
-            <img src={trip.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
-              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
-          ) : (
-            <TripCoverFallback label={label} />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-          <div className="absolute left-3 top-3">
-            <Badge className={cn("text-[10px] font-mono uppercase tracking-widest", s.tone)}>{s.label}</Badge>
+    <div className="group relative">
+      <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="block">
+        <GlassCard className="relative h-full overflow-hidden p-0">
+          <div className="relative h-32 w-full overflow-hidden">
+            {trip.cover_url ? (
+              <img src={trip.cover_url} alt="" className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+            ) : (
+              <TripCoverFallback label={label} />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+            <div className="absolute left-3 top-3">
+              <Badge className={cn("text-[10px] font-mono uppercase tracking-widest", s.tone)}>{s.label}</Badge>
+            </div>
+            {trip.rating != null && trip.status === "completed" && (
+              <div className="absolute right-3 top-3 rounded-full border border-white/20 bg-black/50 px-2 py-0.5 text-xs backdrop-blur">
+                {"★".repeat(trip.rating)}<span className="text-white/30">{"★".repeat(5 - (trip.rating ?? 0))}</span>
+              </div>
+            )}
+            {d !== null && d >= 0 && trip.status !== "completed" && (
+              <div className="absolute bottom-3 right-3 rounded-full border border-primary/40 bg-primary/20 px-2 py-0.5 font-mono text-[10px] uppercase text-primary backdrop-blur">
+                {d === 0 ? "Today" : `T-${d}`}
+              </div>
+            )}
           </div>
-          {trip.rating != null && trip.status === "completed" && (
-            <div className="absolute right-3 top-3 rounded-full border border-white/20 bg-black/50 px-2 py-0.5 text-xs backdrop-blur">
-              {"★".repeat(trip.rating)}<span className="text-white/30">{"★".repeat(5 - (trip.rating ?? 0))}</span>
-            </div>
-          )}
-          {d !== null && d >= 0 && trip.status !== "completed" && (
-            <div className="absolute bottom-3 right-3 rounded-full border border-primary/40 bg-primary/20 px-2 py-0.5 font-mono text-[10px] uppercase text-primary backdrop-blur">
-              {d === 0 ? "Today" : `T-${d}`}
-            </div>
-          )}
-        </div>
-        <div className="p-4">
-          <h3 className="truncate text-base font-semibold">{trip.name}</h3>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {(trip as any).destination_text ?? trip.destination ?? "—"} · {fmtDateRange(trip.start_date, trip.end_date)}
-          </p>
-        </div>
-      </GlassCard>
-    </Link>
+          <div className="p-4">
+            <h3 className="truncate text-base font-semibold">{trip.name}</h3>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+              {(trip as any).destination_text ?? trip.destination ?? "—"} · {fmtDateRange(trip.start_date, trip.end_date)}
+            </p>
+          </div>
+        </GlassCard>
+      </Link>
+      <Link
+        to="/trips/$tripId"
+        params={{ tripId: trip.id }}
+        search={{ edit: 1 } as any}
+        onClick={(e) => e.stopPropagation()}
+        aria-label={`Edit ${trip.name}`}
+        className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/60 px-2 py-1 text-[10px] font-mono uppercase tracking-widest text-white/90 opacity-0 backdrop-blur transition-opacity hover:bg-black/80 group-hover:opacity-100 focus:opacity-100"
+      >
+        <Pencil className="size-3" /> Edit
+      </Link>
+    </div>
   );
 }
 
