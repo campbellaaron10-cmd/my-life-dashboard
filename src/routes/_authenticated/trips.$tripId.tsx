@@ -89,7 +89,10 @@ function TripHeader({ trip, onDeleted }: { trip: Trip; onDeleted: () => void }) 
   const del = useDeleteTrip();
   const upsertPlace = useUpsertPlace();
   const places = usePlaces();
-  const [edit, setEdit] = useState(false);
+  const [edit, setEdit] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("edit") === "1";
+  });
   const [name, setName] = useState(trip.name);
   const [start, setStart] = useState(trip.start_date ?? "");
   const [end, setEnd] = useState(trip.end_date ?? "");
