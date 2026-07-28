@@ -167,12 +167,17 @@ function TripsLandingPage() {
   );
 }
 
-function NextTripStrip({ trip }: { trip: Trip | undefined }) {
+function NextTripStrip({ trip, onNew }: { trip: Trip | undefined; onNew: () => void }) {
   if (!trip) {
     return (
-      <GlassCard className="flex min-h-[160px] flex-col justify-center p-5">
-        <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Next trip</p>
-        <p className="mt-2 text-sm text-muted-foreground">Nothing planned. Time to change that.</p>
+      <GlassCard className="flex min-h-[160px] flex-col justify-between p-5">
+        <div>
+          <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Next trip</p>
+          <p className="mt-2 text-sm text-muted-foreground">Nothing planned. Time to change that.</p>
+        </div>
+        <Button size="sm" className="mt-3 self-start" onClick={onNew}>
+          <Plus className="mr-2 size-4" /> Plan a trip
+        </Button>
       </GlassCard>
     );
   }
@@ -180,12 +185,15 @@ function NextTripStrip({ trip }: { trip: Trip | undefined }) {
   return (
     <Link to="/trips/$tripId" params={{ tripId: trip.id }} className="block">
       <GlassCard className="group relative min-h-[160px] overflow-hidden p-5">
-        {trip.cover_url && (
-          <div className="absolute inset-0 opacity-30 transition-opacity group-hover:opacity-40">
-            <img src={trip.cover_url} alt="" className="size-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-          </div>
-        )}
+        <div className="absolute inset-0 opacity-30 transition-opacity group-hover:opacity-40">
+          {trip.cover_url ? (
+            <img src={trip.cover_url} alt="" className="size-full object-cover"
+              onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+          ) : (
+            <TripCoverFallback label={(trip as any).destination_text ?? trip.destination ?? trip.name} />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+        </div>
         <div className="relative">
           <p className="text-xs font-mono uppercase tracking-widest text-primary/80">Next trip</p>
           <h3 className="mt-1 text-xl font-semibold">{trip.name}</h3>
@@ -201,12 +209,18 @@ function NextTripStrip({ trip }: { trip: Trip | undefined }) {
   );
 }
 
-function UpcomingStrip({ trips }: { trips: Trip[] }) {
+function UpcomingStrip({ trips, onNew }: { trips: Trip[]; onNew: () => void }) {
   return (
-    <GlassCard className="min-h-[160px] p-5">
+    <GlassCard className="flex min-h-[160px] flex-col p-5">
       <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground">Upcoming</p>
       {trips.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">No upcoming trips.</p>
+        <div className="mt-2 flex flex-1 flex-col justify-between">
+          <p className="text-sm text-muted-foreground">No upcoming trips.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={onNew}><Plus className="mr-2 size-4" /> New trip</Button>
+            <Link to="/trips/bucket-list"><Button size="sm" variant="ghost"><Sparkles className="mr-2 size-4" /> Browse bucket list</Button></Link>
+          </div>
+        </div>
       ) : (
         <ul className="mt-3 space-y-2">
           {trips.map((t) => (
