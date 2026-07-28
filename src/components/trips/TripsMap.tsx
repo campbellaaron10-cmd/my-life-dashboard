@@ -42,6 +42,7 @@ export function TripsMap({ pins, height = 420 }: { pins: MapPin[]; height?: numb
             gestureHandling: "greedy",
             ...(mapId ? { mapId } : { styles: darkStyle }),
           });
+          addContinentLabels(mapRef.current, g);
         }
         setReady(true);
       } catch (e: any) {
