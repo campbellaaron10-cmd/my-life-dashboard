@@ -734,23 +734,80 @@ function PhotosTab({ trip }: { trip: Trip }) {
   const [url, setUrl] = useState("");
   const [caption, setCaption] = useState("");
   const [taken, setTaken] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) throw new Error("Not signed in");
+      for (const file of Array.from(files)) {
+        const ext = file.name.split(".").pop() || "jpg";
+        const path = `${uid}/${trip.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("trip-photos").upload(path, file, {
+          contentType: file.type || "image/jpeg",
+          upsert: false,
+        });
+        if (upErr) throw upErr;
+        const { data: signed, error: signErr } = await supabase.storage
+          .from("trip-photos")
+          .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+        if (signErr || !signed) throw signErr ?? new Error("Sign failed");
+        await upsert.mutateAsync({
+          trip_id: trip.id,
+          url: signed.signedUrl,
+          caption: caption || null,
+          taken_on: taken || null,
+          source: "upload",
+          external_id: path,
+        });
+      }
+      setCaption(""); setTaken("");
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (e: any) {
+      alert(e?.message ?? "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
-      <GlassCard className="p-4">
-        <div className="grid gap-2 md:grid-cols-4">
-          <Input placeholder="Image URL" value={url} onChange={(e) => setUrl(e.target.value)} className="md:col-span-2" />
-          <Input placeholder="Caption" value={caption} onChange={(e) => setCaption(e.target.value)} />
+      <GlassCard className="p-4 space-y-3">
+        <div className="grid gap-2 md:grid-cols-2">
+          <Input placeholder="Caption (optional)" value={caption} onChange={(e) => setCaption(e.target.value)} />
           <Input type="date" value={taken} onChange={(e) => setTaken(e.target.value)} />
         </div>
-        <Button className="mt-2" onClick={async () => {
-          if (!url.trim()) return;
-          await upsert.mutateAsync({ trip_id: trip.id, url: url.trim(), caption: caption || null, taken_on: taken || null, source: "manual" });
-          setUrl(""); setCaption(""); setTaken("");
-        }}><Camera className="mr-2 size-4" /> Add photo</Button>
+        <div className="flex flex-wrap gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFiles(e.target.files)}
+          />
+          <Button onClick={() => fileRef.current?.click()} disabled={uploading}>
+            <Camera className="mr-2 size-4" /> {uploading ? "Uploading..." : "Upload from device"}
+          </Button>
+        </div>
+        <div className="pt-2 border-t border-white/10">
+          <p className="mb-2 text-xs text-muted-foreground">Or paste an image URL</p>
+          <div className="grid gap-2 md:grid-cols-[1fr_auto]">
+            <Input placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} />
+            <Button variant="outline" onClick={async () => {
+              if (!url.trim()) return;
+              await upsert.mutateAsync({ trip_id: trip.id, url: url.trim(), caption: caption || null, taken_on: taken || null, source: "manual" });
+              setUrl(""); setCaption(""); setTaken("");
+            }}>Add URL</Button>
+          </div>
+        </div>
       </GlassCard>
 
-      {(photos.data ?? []).length === 0 && <p className="p-4 text-sm text-muted-foreground">No photos yet. Google Photos integration coming.</p>}
+      {(photos.data ?? []).length === 0 && <p className="p-4 text-sm text-muted-foreground">No photos yet.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {(photos.data ?? []).map((p) => (
           <GlassCard key={p.id} className="group relative overflow-hidden p-0">
@@ -759,7 +816,12 @@ function PhotosTab({ trip }: { trip: Trip }) {
             <button
               type="button"
               className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 opacity-0 backdrop-blur transition-opacity group-hover:opacity-100"
-              onClick={() => del.mutate({ id: p.id, trip_id: trip.id })}
+              onClick={async () => {
+                if (p.external_id && p.source === "upload") {
+                  await supabase.storage.from("trip-photos").remove([p.external_id]);
+                }
+                del.mutate({ id: p.id, trip_id: trip.id });
+              }}
             ><Trash2 className="size-4" /></button>
           </GlassCard>
         ))}
