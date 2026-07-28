@@ -129,11 +129,81 @@ export function TripsMap({ pins, height = 420 }: { pins: MapPin[]; height?: numb
 
 const darkStyle = [
   { elementType: "geometry", stylers: [{ color: "#0b1220" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#0b1220" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#0b1220" }, { weight: 3 }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
+  // Bright country labels
+  { featureType: "administrative.country", elementType: "labels.text.fill", stylers: [{ color: "#f8fafc" }, { weight: 700 }] },
+  { featureType: "administrative.country", elementType: "labels.text.stroke", stylers: [{ color: "#0b1220" }, { weight: 4 }] },
+  // Visible country borders
+  { featureType: "administrative.country", elementType: "geometry.stroke", stylers: [{ color: "#64748b" }, { weight: 1.2 }] },
   { featureType: "administrative", elementType: "geometry", stylers: [{ color: "#1f2937" }] },
+  { featureType: "administrative.province", elementType: "geometry.stroke", stylers: [{ color: "#334155" }, { weight: 0.6 }] },
   { featureType: "poi", stylers: [{ visibility: "off" }] },
   { featureType: "road", elementType: "geometry", stylers: [{ color: "#1e293b" }] },
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#0f172a" }] },
   { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#111827" }] },
 ];
+
+const CONTINENTS: Array<{ name: string; lat: number; lng: number }> = [
+  { name: "NORTH AMERICA", lat: 46, lng: -100 },
+  { name: "SOUTH AMERICA", lat: -15, lng: -60 },
+  { name: "EUROPE", lat: 54, lng: 15 },
+  { name: "AFRICA", lat: 2, lng: 20 },
+  { name: "ASIA", lat: 46, lng: 90 },
+  { name: "OCEANIA", lat: -25, lng: 140 },
+];
+
+function addContinentLabels(map: any, g: any) {
+  class ContinentOverlay extends g.OverlayView {
+    div: HTMLDivElement | null = null;
+    constructor(private position: { lat: number; lng: number }, private label: string) { super(); }
+    onAdd() {
+      const div = document.createElement("div");
+      div.textContent = this.label;
+      div.style.cssText = [
+        "position:absolute",
+        "transform:translate(-50%,-50%)",
+        "color:rgba(226,232,240,0.55)",
+        "font-family:ui-sans-serif,system-ui,sans-serif",
+        "font-weight:800",
+        "font-size:22px",
+        "letter-spacing:0.35em",
+        "text-shadow:0 2px 8px rgba(0,0,0,0.8)",
+        "pointer-events:none",
+        "white-space:nowrap",
+        "user-select:none",
+      ].join(";");
+      this.div = div;
+      const panes = (this as any).getPanes();
+      panes.overlayLayer.appendChild(div);
+    }
+    draw() {
+      if (!this.div) return;
+      const proj = (this as any).getProjection();
+      if (!proj) return;
+      const pt = proj.fromLatLngToDivPixel(new g.LatLng(this.position.lat, this.position.lng));
+      if (!pt) return;
+      this.div.style.left = pt.x + "px";
+      this.div.style.top = pt.y + "px";
+      const zoom = map.getZoom() ?? 2;
+      // Fade out as user zooms in past continent scale
+      const opacity = zoom <= 3 ? 1 : zoom <= 4 ? 0.5 : zoom <= 5 ? 0.2 : 0;
+      const fontSize = zoom <= 2 ? 22 : zoom <= 3 ? 18 : 14;
+      this.div.style.opacity = String(opacity);
+      this.div.style.fontSize = fontSize + "px";
+      this.div.style.display = opacity === 0 ? "none" : "block";
+    }
+    onRemove() {
+      if (this.div?.parentNode) this.div.parentNode.removeChild(this.div);
+      this.div = null;
+    }
+  }
+  for (const c of CONTINENTS) {
+    const o = new ContinentOverlay({ lat: c.lat, lng: c.lng }, c.name);
+    o.setMap(map);
+  }
+  map.addListener("zoom_changed", () => {
+    // Trigger redraw of overlays
+    google.maps.event.trigger(map, "bounds_changed");
+  });
+}
