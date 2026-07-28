@@ -47,8 +47,22 @@ function daysUntil(start: string | null): number | null {
 function fmtDateRange(a: string | null, b: string | null) {
   if (!a && !b) return "Dates TBD";
   const fmt = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  if (a && b) return `${fmt(a)} — ${fmt(b)}`;
+  if (a && b) return a === b ? fmt(a) : `${fmt(a)} — ${fmt(b)}`;
   return fmt((a ?? b)!);
+}
+
+function TripCoverFallback({ label }: { label?: string | null }) {
+  const initial = (label ?? "").trim().charAt(0).toUpperCase() || "•";
+  return (
+    <div className="relative size-full overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_20%_10%,rgba(96,165,250,0.35),transparent_60%),radial-gradient(120%_80%_at_80%_90%,rgba(167,139,250,0.3),transparent_60%),linear-gradient(135deg,#0b1220,#111827)]" />
+      <div className="absolute inset-0 opacity-[0.06] mix-blend-overlay"
+        style={{ backgroundImage: "radial-gradient(circle at 1px 1px, #fff 1px, transparent 0)", backgroundSize: "18px 18px" }} />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="font-mono text-5xl font-semibold text-white/25">{initial}</span>
+      </div>
+    </div>
+  );
 }
 
 function TripsLandingPage() {
