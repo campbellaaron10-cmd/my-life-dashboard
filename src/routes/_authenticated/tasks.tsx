@@ -397,7 +397,7 @@ function parseNotes(notes: string | null): { text: string; items: ChecklistItem[
     if (m) items.push({ done: m[1].toLowerCase() === "x", text: m[2], raw: line });
     else other.push(line);
   }
-  return { text: other.join("\n").trim(), items };
+  return { text: other.join("\n"), items };
 }
 
 function TaskDialog({
