@@ -1106,7 +1106,7 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
               rules: rules as any,
               fun_to_vacation_pct: rules.fun_to_vac_pct,
               fun_to_sts_pct: rules.fun_to_sts_pct,
-              fun_to_fun_pct: rules.fun_to_fun_pct,
+              fun_to_fun_pct: rules.fun_to_budget_pct,
             });
             onClose();
           }}>Save</Button>
