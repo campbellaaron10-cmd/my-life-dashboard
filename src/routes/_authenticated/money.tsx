@@ -170,7 +170,16 @@ function FinancesDashboard() {
   const ltsBal = lts ? accountBalance(lts, allTxns) : (balanceByCode.LTS ?? 0);
   const rsuBal = rsu ? accountBalance(rsu, allTxns) : (balanceByCode.RSU ?? 0);
 
+  // Manual starting-budget override for the current month (stored in rules).
+  const setBudgetOverride = async (v: number | null) => {
+    const next = { ...(rules.budget_overrides ?? {}) };
+    if (v == null) delete next[curMonthKey];
+    else next[curMonthKey] = v;
+    await upsertSettings.mutateAsync({ rules: { ...rules, budget_overrides: next } as any });
+  };
+
   const empty = allBudgets.length === 0 && allAccounts.length === 0 && allSummaries.length === 0;
+
 
 
 
