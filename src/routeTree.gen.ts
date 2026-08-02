@@ -25,6 +25,7 @@ import { Route as AuthenticatedTripsIndexRouteImport } from './routes/_authentic
 import { Route as AuthenticatedTripsPlacesRouteImport } from './routes/_authenticated/trips.places'
 import { Route as AuthenticatedTripsBucketListRouteImport } from './routes/_authenticated/trips.bucket-list'
 import { Route as AuthenticatedTripsTripIdRouteImport } from './routes/_authenticated/trips.$tripId'
+import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicHooksProcessVaultRemindersRouteImport } from './routes/api/public/hooks/process-vault-reminders'
 
 const AuthRoute = AuthRouteImport.update({
@@ -109,6 +110,11 @@ const AuthenticatedTripsTripIdRoute =
     path: '/$tripId',
     getParentRoute: () => AuthenticatedTripsRoute,
   } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksProcessVaultRemindersRoute =
   ApiPublicHooksProcessVaultRemindersRouteImport.update({
     id: '/api/public/hooks/process-vault-reminders',
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/trips': typeof AuthenticatedTripsRouteWithChildren
   '/vault': typeof AuthenticatedVaultRoute
   '/weather': typeof AuthenticatedWeatherRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/trips/bucket-list': typeof AuthenticatedTripsBucketListRoute
   '/trips/places': typeof AuthenticatedTripsPlacesRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/vault': typeof AuthenticatedVaultRoute
   '/weather': typeof AuthenticatedWeatherRoute
   '/': typeof AuthenticatedIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/trips/bucket-list': typeof AuthenticatedTripsBucketListRoute
   '/trips/places': typeof AuthenticatedTripsPlacesRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/_authenticated/vault': typeof AuthenticatedVaultRoute
   '/_authenticated/weather': typeof AuthenticatedWeatherRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/_authenticated/trips/$tripId': typeof AuthenticatedTripsTripIdRoute
   '/_authenticated/trips/bucket-list': typeof AuthenticatedTripsBucketListRoute
   '/_authenticated/trips/places': typeof AuthenticatedTripsPlacesRoute
@@ -185,6 +194,7 @@ export interface FileRouteTypes {
     | '/trips'
     | '/vault'
     | '/weather'
+    | '/.lovable/oauth/consent'
     | '/trips/$tripId'
     | '/trips/bucket-list'
     | '/trips/places'
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/vault'
     | '/weather'
     | '/'
+    | '/.lovable/oauth/consent'
     | '/trips/$tripId'
     | '/trips/bucket-list'
     | '/trips/places'
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vault'
     | '/_authenticated/weather'
     | '/_authenticated/'
+    | '/.lovable/oauth/consent'
     | '/_authenticated/trips/$tripId'
     | '/_authenticated/trips/bucket-list'
     | '/_authenticated/trips/places'
@@ -231,6 +243,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   ApiPublicHooksProcessVaultRemindersRoute: typeof ApiPublicHooksProcessVaultRemindersRoute
 }
 
@@ -348,6 +361,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTripsTripIdRouteImport
       parentRoute: typeof AuthenticatedTripsRoute
     }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/process-vault-reminders': {
       id: '/api/public/hooks/process-vault-reminders'
       path: '/api/public/hooks/process-vault-reminders'
@@ -407,6 +427,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   ApiPublicHooksProcessVaultRemindersRoute:
     ApiPublicHooksProcessVaultRemindersRoute,
 }
