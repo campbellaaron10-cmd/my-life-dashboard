@@ -1028,18 +1028,10 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
   const upsert = useUpsertFinanceSettings();
   const [rules, setRules] = useState<FinanceRules>(DEFAULT_RULES);
   useEffect(() => {
-    if (settingsRow) {
-      setRules({
-        ...DEFAULT_RULES,
-        ...((settingsRow.rules ?? {}) as Partial<FinanceRules>),
-        fun_to_vac_pct: Number(settingsRow.fun_to_vacation_pct ?? DEFAULT_RULES.fun_to_vac_pct),
-        fun_to_sts_pct: Number(settingsRow.fun_to_sts_pct ?? DEFAULT_RULES.fun_to_sts_pct),
-        fun_to_fun_pct: Number(settingsRow.fun_to_fun_pct ?? DEFAULT_RULES.fun_to_fun_pct),
-      });
-    }
+    if (settingsRow) setRules(resolveRules(settingsRow.rules));
   }, [settingsRow, open]);
   const setR = <K extends keyof FinanceRules>(k: K, v: FinanceRules[K]) => setRules({ ...rules, [k]: v });
-  const funTotal = rules.fun_to_vac_pct + rules.fun_to_sts_pct + rules.fun_to_fun_pct;
+  const funTotal = rules.fun_to_vac_pct + rules.fun_to_sts_pct + rules.fun_to_budget_pct;
   const allocTotal = rules.ess_pct + rules.fun_pct + rules.sts_pct;
 
   return (
@@ -1052,8 +1044,9 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
           <section>
             <h3 className="mb-2 text-sm font-semibold">Budget formula</h3>
             <p className="text-xs text-muted-foreground">
-              Budget = prior month Income − prior month Housing &amp; Utilities. That budget flows into
-              Essentials, Fun, and Short-Term Savings by the percentages below.
+              Budget = (prior month Income − prior month Housing &amp; Utilities) + {rules.fun_to_budget_pct}% of
+              prior month's leftover Fun money. That budget splits into Essentials, Fun, and
+              Short-Term Savings by the percentages below.
             </p>
             <div className="mt-3 grid grid-cols-3 gap-3">
               <Field label="Essentials %"><Input type="number" value={rules.ess_pct} onChange={(e) => setR("ess_pct", Number(e.target.value))} /></Field>
@@ -1071,8 +1064,9 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
             <div className="mt-3 grid grid-cols-3 gap-3">
               <Field label="→ Vacation Fund %"><Input type="number" value={rules.fun_to_vac_pct} onChange={(e) => setR("fun_to_vac_pct", Number(e.target.value))} /></Field>
               <Field label="→ Short-Term Savings %"><Input type="number" value={rules.fun_to_sts_pct} onChange={(e) => setR("fun_to_sts_pct", Number(e.target.value))} /></Field>
-              <Field label="→ Next month Fun %"><Input type="number" value={rules.fun_to_fun_pct} onChange={(e) => setR("fun_to_fun_pct", Number(e.target.value))} /></Field>
+              <Field label="→ Next month's budget %"><Input type="number" value={rules.fun_to_budget_pct} onChange={(e) => setR("fun_to_budget_pct", Number(e.target.value))} /></Field>
             </div>
+
             <p className={`mt-1 text-xs ${funTotal === 100 ? "text-muted-foreground" : "text-warning"}`}>Total: {funTotal}%</p>
           </section>
 
