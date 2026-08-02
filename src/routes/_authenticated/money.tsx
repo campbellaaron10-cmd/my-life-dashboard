@@ -170,6 +170,9 @@ function FinancesDashboard() {
   const ltsBal = lts ? accountBalance(lts, allTxns) : (balanceByCode.LTS ?? 0);
   const rsuBal = rsu ? accountBalance(rsu, allTxns) : (balanceByCode.RSU ?? 0);
 
+  const empty = allBudgets.length === 0 && allAccounts.length === 0 && allSummaries.length === 0;
+
+
 
   return (
     <div className="space-y-8">
