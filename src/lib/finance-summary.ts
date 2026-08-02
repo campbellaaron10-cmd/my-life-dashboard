@@ -1,12 +1,20 @@
 // Shared finance derivations. Single source of truth for both the Finances
-// module (`/money`) and the dashboard Financial Core widget.
+// module (`/money`) and the dashboard Financial Core widget. All math lives in
+// `finance-engine.ts`; this hook just wires it to the data layer.
 import { useMemo } from "react";
 import {
   useAccounts, useTransactions, useBudgets,
-  useMonthlySummaries, useBalanceSnapshots,
-  accountBalance,
-  type Account, type BudgetCategory, type MonthlySummary, type BalanceSnapshot,
+  useMonthlySummaries, useBalanceSnapshots, useFinanceSettings,
+  accountBalance, DEFAULT_RULES,
+  type Account, type BudgetCategory, type MonthlySummary, type BalanceSnapshot, type FinanceRules,
 } from "@/lib/atlas-data";
+import {
+  computeFinance, monthKeyOf, monthLabel, monthOfDate, parseLocalDate,
+  type MonthDerived, type FinanceRulesFull,
+} from "@/lib/finance-engine";
+
+export { monthKeyOf, monthLabel, monthOfDate, parseLocalDate };
+export type { MonthDerived };
 
 export const SERIES_COLOR: Record<string, string> = {
   HOU: "#f59e0b",
@@ -31,28 +39,41 @@ export const CATEGORY_LABELS: Record<string, { long: string; short: string }> = 
   RSU: { long: "Restricted Stock Units", short: "RSU" },
 };
 
-export const monthKey = (d: Date) =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+/** Merge stored rules JSONB with defaults, tolerating the legacy shape. */
+export function resolveRules(raw: unknown): FinanceRules {
+  const r = { ...DEFAULT_RULES, ...((raw as Partial<FinanceRules>) ?? {}) };
+  if (r.fun_to_budget_pct == null && r.fun_to_fun_pct != null) r.fun_to_budget_pct = r.fun_to_fun_pct;
+  return r;
+}
 
-export const monthLabel = (iso: string) => {
-  const [y, m] = iso.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-};
+export const engineRules = (r: FinanceRules): FinanceRulesFull => ({
+  ess_pct: Number(r.ess_pct),
+  fun_pct: Number(r.fun_pct),
+  sts_pct: Number(r.sts_pct),
+  fun_to_vac_pct: Number(r.fun_to_vac_pct),
+  fun_to_budget_pct: Number(r.fun_to_budget_pct),
+  fun_to_sts_pct: Number(r.fun_to_sts_pct),
+});
 
 export type FinanceSummary = {
   loading: boolean;
   netWorth: number;
   monthlyBudget: number;
   budgetIsSet: boolean;
+  budgetIsOverride: boolean;
   monthlySpent: number;
   remainingBudget: number;
   nextMonthIncome: number;
   priorMonthLabel: string;
   currentSummary: MonthlySummary | null;
+  current: MonthDerived | null;
+  previous: MonthDerived | null;
+  months: MonthDerived[];
   balanceByCode: Record<string, number>;
   spentByCode: Record<string, number>;
   contribByCode: Record<string, number>;
   allocByCode: Record<string, number>;
+  rules: FinanceRules;
   budgets: BudgetCategory[];
   accounts: Account[];
   summaries: MonthlySummary[];
@@ -60,8 +81,7 @@ export type FinanceSummary = {
 };
 
 /**
- * Consolidated finance state derived from accounts, transactions, budgets,
- * and stored monthly summaries. Values mirror the Finances module exactly.
+ * Consolidated finance state, recomputed live from transactions + rules.
  */
 export function useFinanceSummary(): FinanceSummary {
   const accounts = useAccounts();
@@ -69,105 +89,81 @@ export function useFinanceSummary(): FinanceSummary {
   const budgets = useBudgets();
   const summaries = useMonthlySummaries();
   const snapshots = useBalanceSnapshots();
+  const settings = useFinanceSettings();
 
   const allAccounts = accounts.data ?? [];
   const allTxns = txns.data ?? [];
   const allBudgets = budgets.data ?? [];
   const allSummaries = summaries.data ?? [];
+  const allSnapshots = snapshots.data ?? [];
+  const rules = useMemo(() => resolveRules(settings.data?.rules), [settings.data?.rules]);
 
   return useMemo(() => {
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const curMonthKey = monthKey(monthStart);
+    const result = computeFinance({
+      transactions: allTxns,
+      categories: allBudgets,
+      summaries: allSummaries,
+      accounts: allAccounts,
+      snapshots: allSnapshots,
+      rules: engineRules(rules),
+      budgetOverrides: rules.budget_overrides ?? {},
+    });
 
-    // Net worth = sum of every account (checking, savings, brokerage, etc.)
-    // PLUS any monthly-summary balance code that has no matching account
-    // yet (so RSU / Fidelity / LTS / VAC / STS / Regions imported from Excel
-    // still count until a real account row is added for them).
+    const now = new Date();
+    const curMonthKey = monthKeyOf(now);
+    const cur = result.current;
+    const latest = result.months.at(-1) ?? null;
+    const balanceByCode: Record<string, number> = { ...(latest?.balances ?? {}) };
+
+    // Net worth = every account balance PLUS any derived balance code that has
+    // no matching account row yet (imported history still counts).
     const accountsTotal = allAccounts.reduce((s, a) => s + accountBalance(a, allTxns), 0);
-    const latest = allSummaries.at(-1);
     const has = (re: RegExp, type?: Account["type"]) =>
       allAccounts.some((a) => re.test(a.name) || (type ? a.type === type : false));
-    const summaryFallback =
-      (has(/regions/i, "checking") ? 0 : Number(latest?.regions_balance ?? 0)) +
-      (has(/fidelity|brokerage/i, "investment") ? 0 : Number(latest?.fed_balance ?? 0)) +
-      (has(/401|retirement/i, "retirement") ? 0 : Number(latest?.lts_balance ?? 0)) +
-      (has(/rsu|stock|equity/i) ? 0 : Number((latest as any)?.rsu_balance ?? 0)) +
-      (has(/vacation|\bvac\b/i) ? 0 : Number(latest?.vac_balance ?? 0)) +
-      (has(/short.?term|\bsts\b/i) ? 0 : Number(latest?.sts_balance ?? 0));
-    const netWorth = accountsTotal + summaryFallback;
+    const fallback =
+      (has(/regions/i, "checking") ? 0 : balanceByCode.Regions ?? 0) +
+      (has(/fidelity|brokerage/i, "investment") ? 0 : balanceByCode.FED ?? 0) +
+      (has(/401|retirement/i, "retirement") ? 0 : balanceByCode.LTS ?? 0) +
+      (has(/rsu|stock|equity|restricted/i) ? 0 : balanceByCode.RSU ?? 0) +
+      (has(/vacation|\bvac\b/i) ? 0 : balanceByCode.VAC ?? 0) +
+      (has(/short.?term|\bsts\b/i) ? 0 : balanceByCode.STS ?? 0);
 
-    const currentSummary = allSummaries.find((s) => s.month === curMonthKey) ?? null;
-    const latestSummary = allSummaries.at(-1) ?? null;
-    const monthlyBudget = currentSummary ? Number(currentSummary.budget) : 0;
-    const budgetIsSet = !!currentSummary;
-
-    const spentByCode: Record<string, number> = {
-      HOU: Number(currentSummary?.housing ?? 0),
-      ESS: Number(currentSummary?.ess_spent ?? 0),
-      FUN: Number(currentSummary?.fun_spent ?? 0),
-    };
-    const contribByCode: Record<string, number> = {
-      STS: Number(currentSummary?.sts_spent ?? 0),
-      LTS: Number(currentSummary?.lts_contribution ?? 0),
-      FED: Number(currentSummary?.fed_earnings ?? 0),
-      RSU: Number(currentSummary?.rsu_contribution ?? 0),
-    };
-    const allocByCode: Record<string, number> = {
-      HOU: Number(currentSummary?.housing ?? 0),
-      ESS: Number(currentSummary?.ess_allocated ?? 0),
-      FUN: Number(currentSummary?.fun_allocated ?? 0),
-      STS: Number(currentSummary?.sts_allocated ?? 0),
-    };
-    const balanceByCode: Record<string, number> = {
-      STS: Number(latestSummary?.sts_balance ?? 0),
-      VAC: Number(latestSummary?.vac_balance ?? 0),
-      LTS: Number(latestSummary?.lts_balance ?? 0),
-      FED: Number(latestSummary?.fed_balance ?? 0),
-      RSU: Number((latestSummary as any)?.rsu_balance ?? 0),
-      Regions: Number(latestSummary?.regions_balance ?? 0),
-    };
-
-    const summarySpendTotal = spentByCode.HOU + spentByCode.ESS + spentByCode.FUN;
-    const liveMonthlySpent = allTxns
-      .filter((t) => t.type === "expense" &&
-        new Date(t.occurred_on) >= monthStart &&
-        new Date(t.occurred_on) < nextMonthStart)
-      .reduce((s, t) => s + Number(t.amount), 0);
-    const monthlySpent = summarySpendTotal > 0 ? summarySpendTotal : liveMonthlySpent;
-
-    const nextMonthIncome = allTxns
-      .filter((t) => t.type === "income" &&
-        new Date(t.occurred_on) >= monthStart &&
-        new Date(t.occurred_on) < nextMonthStart)
-      .reduce((s, t) => s + Number(t.amount), 0);
-
-    const priorMonthLabel = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      .toLocaleString("en-US", { month: "long" });
+    const monthlyBudget = cur?.budget ?? 0;
+    const monthlySpent = cur ? cur.spent.HOU + cur.spent.ESS + cur.spent.FUN : 0;
+    const nextMonthIncome = cur?.income ?? 0;
 
     return {
       loading: accounts.isLoading || txns.isLoading || summaries.isLoading || budgets.isLoading,
-      netWorth,
+      netWorth: accountsTotal + fallback,
       monthlyBudget,
-      budgetIsSet,
+      budgetIsSet: monthlyBudget > 0,
+      budgetIsOverride: !!cur?.budgetIsOverride,
       monthlySpent,
-      remainingBudget: monthlyBudget - monthlySpent,
+      remainingBudget: monthlyBudget - (cur ? cur.spent.ESS + cur.spent.FUN : 0),
       nextMonthIncome,
-      priorMonthLabel,
-      currentSummary,
+      priorMonthLabel: new Date(now.getFullYear(), now.getMonth() - 1, 1)
+        .toLocaleString("en-US", { month: "long" }),
+      currentSummary: allSummaries.find((s) => s.month === curMonthKey) ?? null,
+      current: cur,
+      previous: result.previous,
+      months: result.months,
       balanceByCode,
-      spentByCode,
-      contribByCode,
-      allocByCode,
+      spentByCode: cur?.spent ?? { HOU: 0, ESS: 0, FUN: 0 },
+      contribByCode: cur?.contrib ?? { STS: 0, LTS: 0, FED: 0, RSU: 0 },
+      allocByCode: {
+        HOU: cur?.spent.HOU ?? 0,
+        ESS: cur?.alloc.ESS ?? 0,
+        FUN: cur?.alloc.FUN ?? 0,
+        STS: cur?.alloc.STS ?? 0,
+      },
+      rules,
       budgets: allBudgets,
       accounts: allAccounts,
       summaries: allSummaries,
-      snapshots: snapshots.data ?? [],
+      snapshots: allSnapshots,
     };
   }, [
-    allAccounts, allTxns, allBudgets, allSummaries,
-    snapshots.data,
+    allAccounts, allTxns, allBudgets, allSummaries, allSnapshots, rules,
     accounts.isLoading, txns.isLoading, summaries.isLoading, budgets.isLoading,
   ]);
 }
