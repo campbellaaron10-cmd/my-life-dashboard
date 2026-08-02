@@ -324,39 +324,95 @@ function FinancesDashboard() {
       {/* Growth chart with mode selector */}
       <GrowthChart months={months} snapshots={snapshots.data ?? []} />
 
-      {/* Recent activity */}
+      {/* Recent activity — last 120 days by default, custom range optional */}
       <GlassCard>
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Recent activity</h2>
-          <Button
-            size="sm"
-            onClick={() => setTxnDialog({ type: "expense", occurred_on: new Date().toISOString().slice(0, 10) })}
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <button
+            className="flex items-center gap-2 text-left"
+            onClick={() => setActivityOpen((v) => !v)}
+            aria-expanded={activityOpen}
           >
-            <Plus className="mr-1 size-4" /> Add transaction
-          </Button>
+            <ChevronDown
+              className={`size-5 text-muted-foreground transition-transform ${activityOpen ? "" : "-rotate-90"}`}
+            />
+            <span>
+              <span className="block text-xl font-semibold">Recent activity</span>
+              <span className="block text-xs text-muted-foreground">
+                {activityCustom
+                  ? `${activityFrom} → ${activityTo} · ${activityTxns.length} entries`
+                  : `Last 120 days · ${activityTxns.length} entries`}
+              </span>
+            </span>
+          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant={activityCustom ? "secondary" : "outline"}
+              onClick={() => {
+                const next = !activityCustom;
+                setActivityCustom(next);
+                setActivityOpen(true);
+                if (!next) {
+                  setActivityFrom(isoDaysAgo(120));
+                  setActivityTo(new Date().toISOString().slice(0, 10));
+                }
+              }}
+            >
+              {activityCustom ? "Last 120 days" : "Custom range"}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setTxnDialog({ type: "expense", occurred_on: new Date().toISOString().slice(0, 10) })}
+            >
+              <Plus className="mr-1 size-4" /> Add transaction
+            </Button>
+          </div>
         </div>
-        {allTxns.length === 0 ? (
-          <EmptyState text="Log a transaction to start tracking against budgets." />
-        ) : (
-          <div className="space-y-1">
-            {allTxns.slice(0, 30).map((t) => {
-              const acc = allAccounts.find((a) => a.id === t.account_id);
-              const cat = allBudgets.find((b) => b.id === t.category_id);
-              const isCredit = t.type === "income" || t.type === "adjustment";
-              return (
-                <TxnRow
-                  key={t.id}
-                  txn={t}
-                  account={acc}
-                  category={cat}
-                  isCredit={isCredit}
-                  onEdit={() => setTxnDialog(t)}
-                />
-              );
-            })}
+
+        {activityOpen && activityCustom && (
+          <div className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div>
+              <Label className="text-xs text-muted-foreground">From</Label>
+              <Input type="date" value={activityFrom} onChange={(e) => setActivityFrom(e.target.value)} className="mt-1 w-40" />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">To</Label>
+              <Input type="date" value={activityTo} onChange={(e) => setActivityTo(e.target.value)} className="mt-1 w-40" />
+            </div>
           </div>
         )}
+
+        {activityOpen && (
+          activityTxns.length === 0 ? (
+            <EmptyState
+              text={
+                allTxns.length === 0
+                  ? "Log a transaction to start tracking against budgets."
+                  : "No transactions in this date range."
+              }
+            />
+          ) : (
+            <div className="space-y-1">
+              {activityTxns.map((t) => {
+                const acc = allAccounts.find((a) => a.id === t.account_id);
+                const cat = allBudgets.find((b) => b.id === t.category_id);
+                const isCredit = t.type === "income" || t.type === "adjustment";
+                return (
+                  <TxnRow
+                    key={t.id}
+                    txn={t}
+                    account={acc}
+                    category={cat}
+                    isCredit={isCredit}
+                    onEdit={() => setTxnDialog(t)}
+                  />
+                );
+              })}
+            </div>
+          )
+        )}
       </GlassCard>
+
 
       {/* Monthly history */}
       <GlassCard>
