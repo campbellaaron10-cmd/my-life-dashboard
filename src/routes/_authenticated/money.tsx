@@ -66,13 +66,12 @@ const CATEGORY_LABELS: Record<string, { long: string; short: string }> = {
   RSU: { long: "Restricted Stock Units", short: "RSU" },
 };
 
-const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const fmt2 = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-const monthLabel = (iso: string) => {
-  const [y, m] = iso.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-};
+// Finance module always shows cents (the dashboard rounds to whole dollars).
+const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt2 = fmt;
+const monthKey = monthKeyOf;
+const monthLabel = monthLabelOf;
+
 
 // Higher-contrast chart tokens (used inline so the values are literal for Recharts).
 const CHART = {
