@@ -280,9 +280,10 @@ function FinancesDashboard() {
                 key={c.id}
                 cat={c}
                 txns={allTxns}
-                contribution={Math.max(contributionByCat.get(c.id) ?? 0, summaryContribByCode[c.code] ?? 0)}
-                summarySpent={summarySpentByCode[c.code]}
-                summaryAllocation={summaryAllocByCode[c.code]}
+                contribution={contribByCode[c.code] ?? 0}
+                spent={spentByCode[c.code] ?? 0}
+                allocation={allocByCode[c.code] ?? 0}
+
                 balance={balanceByCode[c.code] ?? 0}
                 onEdit={() => setBudgetDialog(c)}
               />
