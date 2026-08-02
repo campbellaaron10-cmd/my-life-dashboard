@@ -29,6 +29,9 @@ import {
   type Account, type Transaction, type BudgetCategory, type BalanceSnapshot, type MonthlySummary,
 } from "@/lib/atlas-data";
 import { PrivacyGuard } from "@/context/PrivacyMode";
+import { useFinanceSummary, resolveRules } from "@/lib/finance-summary";
+import { monthKeyOf, monthLabel as monthLabelOf, parseLocalDate, type MonthDerived } from "@/lib/finance-engine";
+
 
 export const Route = createFileRoute("/_authenticated/money")({
   head: () => ({ meta: [{ title: "Finances — Atlas" }] }),
