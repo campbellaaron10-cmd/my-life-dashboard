@@ -552,21 +552,20 @@ function MonthlyBudgetCard({
 
 
 function BudgetRow({
-  cat, txns, contribution, balance, summarySpent, summaryAllocation, onEdit,
+  cat, txns, contribution, balance, spent: spentProp, allocation, onEdit,
 }: {
   cat: BudgetCategory;
   txns: Transaction[];
   contribution: number;
   balance: number;
-  summarySpent?: number;
-  summaryAllocation?: number;
+  spent?: number;
+  allocation?: number;
   onEdit: () => void;
 }) {
   const liveSpent = budgetSpent(cat, txns);
-  const spent = (summarySpent && summarySpent > 0) ? summarySpent : liveSpent;
-  const limit = (summaryAllocation && summaryAllocation > 0)
-    ? summaryAllocation
-    : Number(cat.monthly_limit);
+  const spent = spentProp != null && spentProp > 0 ? spentProp : liveSpent;
+  // Allocation is derived from this month's budget × the category percentage.
+  const limit = allocation != null && allocation > 0 ? allocation : Number(cat.monthly_limit);
   const goal = cat.goal_amount ? Number(cat.goal_amount) : null;
   const label = CATEGORY_LABELS[cat.code] ?? { long: cat.name, short: cat.code };
   const accent = (cat.color && cat.color.startsWith("#")) ? cat.color : (SERIES_COLOR[cat.code] ?? "hsl(var(--primary))");
@@ -577,8 +576,6 @@ function BudgetRow({
   // derived from (income − housing). Show spend only, no bar/remaining/%.
   const isHousing = cat.code === "HOU";
 
-  // Spending: bar tracks spent vs monthly allocation.
-  // Savings/investment: bar tracks actual contribution vs planned contribution (or goal for savings).
   let barValue = 0;
   let barMax = 0;
   let headline = "";
@@ -591,14 +588,11 @@ function BudgetRow({
   } else {
     barValue = contribution;
     barMax = limit > 0 ? limit : (goal ?? 0);
-    headline = limit > 0
-      ? `${fmt(contribution)} / ${fmt(limit)} planned`
-      : `${fmt(contribution)} contributed`;
+    headline = `${fmt(contribution)} contributed`;
   }
   const pct = barMax > 0 ? Math.min(100, (barValue / barMax) * 100) : 0;
   const overspent = isSpending && !isHousing && limit > 0 && spent > limit;
   const goalPct = goal && goal > 0 ? Math.min(100, (balance / goal) * 100) : null;
-
 
   return (
     <button
@@ -637,8 +631,6 @@ function BudgetRow({
         </div>
       ) : (
         <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>Planned contribution</span>
-          <span className="text-right font-mono">{fmt(limit)}</span>
           <span>Actual this month</span>
           <span className="text-right font-mono">{fmt(contribution)}</span>
           <span>Current balance</span>
@@ -660,6 +652,7 @@ function BudgetRow({
     </button>
   );
 }
+
 
 
 function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction; account?: Account; category?: BudgetCategory; isCredit: boolean; onEdit: () => void }) {
