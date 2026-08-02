@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Plus, Trash2, Wallet, Sparkles, RefreshCw,
-  Settings2, Target, LineChart as LineChartIcon, Upload, FileSpreadsheet, Pencil,
+  Settings2, Target, LineChart as LineChartIcon, Upload, FileSpreadsheet, Pencil, ChevronDown,
 } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
