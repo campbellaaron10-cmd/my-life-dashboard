@@ -119,6 +119,7 @@ function FinancesDashboard() {
   const snapshots = useBalanceSnapshots();
   const summaries = useMonthlySummaries();
   const seed = useSeedFinanceDefaults();
+  const upsertSettings = useUpsertFinanceSettings();
 
   const [txnDialog, setTxnDialog] = useState<Partial<Transaction> | null>(null);
   const [budgetDialog, setBudgetDialog] = useState<Partial<BudgetCategory> | null>(null);
