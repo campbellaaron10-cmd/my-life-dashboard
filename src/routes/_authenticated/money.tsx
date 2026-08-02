@@ -253,9 +253,14 @@ function FinancesDashboard() {
         <MonthlyBudgetCard
           budget={monthlyBudget}
           budgetIsSet={budgetIsSet}
+          isOverride={finance.budgetIsOverride}
           spent={monthlySpent}
           nextMonthIncome={monthlyIncome}
           priorMonthLabel={priorMonthLabel}
+          previous={finance.previous}
+          rules={rules}
+          onSetBudget={setBudgetOverride}
+
         />
 
       </div>
