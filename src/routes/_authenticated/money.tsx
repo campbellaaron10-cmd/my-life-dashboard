@@ -134,125 +134,42 @@ function FinancesDashboard() {
   const allBudgets = budgets.data ?? [];
   const allSummaries = summaries.data ?? [];
 
-  const rules: FinanceRules = { ...DEFAULT_RULES, ...((settings.data?.rules ?? {}) as Partial<FinanceRules>) };
+  // Everything below is derived live by the finance engine: budgets, category
+  // allocations, leftover-Fun splits and balances all recompute whenever a
+  // transaction (or its date) changes.
+  const finance = useFinanceSummary();
+  const rules = finance.rules;
+  const months = finance.months;
+  const netWorth = finance.netWorth;
 
-  // Net worth = accounts + summary-balance fallbacks for codes that don't
-  // have a real account row yet (RSU, Fidelity, LTS, VAC, STS, Regions).
-  const netWorth = useMemo(() => {
-    const accountsTotal = allAccounts.reduce((s, a) => s + accountBalance(a, allTxns), 0);
-    const latest = allSummaries.at(-1);
-    const has = (re: RegExp, type?: Account["type"]) =>
-      allAccounts.some((a) => re.test(a.name) || (type ? a.type === type : false));
-    const fallback =
-      (has(/regions/i, "checking") ? 0 : Number(latest?.regions_balance ?? 0)) +
-      (has(/fidelity|brokerage/i, "investment") ? 0 : Number(latest?.fed_balance ?? 0)) +
-      (has(/401|retirement/i, "retirement") ? 0 : Number(latest?.lts_balance ?? 0)) +
-      (has(/rsu|stock|equity/i) ? 0 : Number((latest as any)?.rsu_balance ?? 0)) +
-      (has(/vacation|\bvac\b/i) ? 0 : Number(latest?.vac_balance ?? 0)) +
-      (has(/short.?term|\bsts\b/i) ? 0 : Number(latest?.sts_balance ?? 0));
-    return accountsTotal + fallback;
-  }, [allAccounts, allTxns, allSummaries]);
-
-  // Current + previous month markers.
   const now = new Date();
-  const monthStart = useMemo(() => new Date(now.getFullYear(), now.getMonth(), 1), []);
-  const nextMonthStart = useMemo(() => new Date(now.getFullYear(), now.getMonth() + 1, 1), []);
-  const prevMonthKey = useMemo(() => monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1)), []);
-  const curMonthKey = monthKey(monthStart);
+  const curMonthKey = monthKey(now);
+  const cur: MonthDerived | null = finance.current;
 
-  const monthlyIncome = useMemo(
-    () => allTxns
-      .filter((t) => t.type === "income" && new Date(t.occurred_on) >= monthStart && new Date(t.occurred_on) < nextMonthStart)
-      .reduce((s, t) => s + Number(t.amount), 0),
-    [allTxns, monthStart, nextMonthStart],
-  );
+  const monthlyIncome = finance.nextMonthIncome;
+  const monthlyBudget = finance.monthlyBudget;
+  const budgetIsSet = finance.budgetIsSet;
+  const monthlySpent = finance.monthlySpent;
+  const priorMonthLabel = finance.priorMonthLabel;
 
-  // Current-month budget comes from the stored monthly summary created when
-  // the prior month was closed. Do NOT invent one from prior income/housing —
-  // the workbook rule is applied by the Close-Month workflow, not here.
-  void prevMonthKey;
-  const currentSummary = allSummaries.find((s) => s.month === curMonthKey);
-  const monthlyBudget = currentSummary ? Number(currentSummary.budget) : 0;
-  const budgetIsSet = !!currentSummary;
-
-  // Spending per spending-category — sourced from the imported monthly
-  // summary when present, falling back to live transactions.
-  const summarySpentByCode: Record<string, number> = {
-    HOU: Number(currentSummary?.housing ?? 0),
-    ESS: Number(currentSummary?.ess_spent ?? 0),
-    FUN: Number(currentSummary?.fun_spent ?? 0),
-  };
-  // Savings / investment "actual contribution this month" from the summary.
-  const summaryContribByCode: Record<string, number> = {
-    STS: Number(currentSummary?.sts_spent ?? 0),
-    LTS: Number(currentSummary?.lts_contribution ?? 0),
-    FED: Number(currentSummary?.fed_earnings ?? 0),
-    RSU: Number(currentSummary?.rsu_contribution ?? 0),
-  };
-  // Planned allocation overrides from the summary (per workbook plan).
-  const summaryAllocByCode: Record<string, number> = {
-    HOU: Number(currentSummary?.housing ?? 0),
-    ESS: Number(currentSummary?.ess_allocated ?? 0),
-    FUN: Number(currentSummary?.fun_allocated ?? 0),
-    STS: Number(currentSummary?.sts_allocated ?? 0),
-  };
-
-  // Contribution this month, per category: sum of savings_contribution /
-  // investment_contribution transactions tagged to that category.
-  const contributionByCat = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const t of allTxns) {
-      if (!t.category_id) continue;
-      if (t.type !== "savings_contribution" && t.type !== "investment_contribution") continue;
-      const d = new Date(t.occurred_on);
-      if (d < monthStart || d >= nextMonthStart) continue;
-      map.set(t.category_id, (map.get(t.category_id) ?? 0) + Number(t.amount));
-    }
-    return map;
-  }, [allTxns, monthStart, nextMonthStart]);
-
-  // Cumulative balance per savings/investment code — sourced from the latest
-  // monthly summary. Never treated as a current-month allocation.
-  const latestSummary = allSummaries.at(-1);
-  const balanceByCode: Record<string, number> = {
-    STS: Number(latestSummary?.sts_balance ?? 0),
-    VAC: Number(latestSummary?.vac_balance ?? 0),
-    LTS: Number(latestSummary?.lts_balance ?? 0),
-    FED: Number(latestSummary?.fed_balance ?? 0),
-    RSU: Number((latestSummary as any)?.rsu_balance ?? 0),
-  };
-
-  // Total spent this month — prefer imported summary sums, else live txns.
-  const summarySpendTotal =
-    summarySpentByCode.HOU + summarySpentByCode.ESS + summarySpentByCode.FUN;
-  const liveMonthlySpent = useMemo(
-    () => allTxns
-      .filter((t) => t.type === "expense" && new Date(t.occurred_on) >= monthStart && new Date(t.occurred_on) < nextMonthStart)
-      .reduce((s, t) => s + Number(t.amount), 0),
-    [allTxns, monthStart, nextMonthStart],
-  );
-  const monthlySpent = summarySpendTotal > 0 ? summarySpendTotal : liveMonthlySpent;
-
-  const priorMonthLabel = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    .toLocaleString("en-US", { month: "long" });
-
-
+  const spentByCode = finance.spentByCode;
+  const allocByCode = finance.allocByCode;
+  const contribByCode = finance.contribByCode;
+  const balanceByCode = finance.balanceByCode;
 
   const findAcc = (nameFragment: string) =>
     allAccounts.find((a) => a.name.toLowerCase().includes(nameFragment.toLowerCase()));
   const regions = findAcc("regions") ?? allAccounts.find((a) => a.type === "checking");
   const fidelity = findAcc("fidelity") ?? allAccounts.find((a) => a.type === "investment");
   const lts = findAcc("401") ?? allAccounts.find((a) => a.type === "retirement");
-  const rsu = findAcc("rsu") ?? findAcc("stock");
+  const rsu = findAcc("rsu") ?? findAcc("stock") ?? findAcc("restricted");
 
-  // Live account balances (with monthly-summary fallback derived above).
-  const regionsBal = regions ? accountBalance(regions, allTxns) : Number(latestSummary?.regions_balance ?? 0);
-  const fedBal = fidelity ? accountBalance(fidelity, allTxns) : balanceByCode.FED;
-  const ltsBal = lts ? accountBalance(lts, allTxns) : balanceByCode.LTS;
-  const rsuBal = rsu ? accountBalance(rsu, allTxns) : balanceByCode.RSU;
+  // Live account balances, with the derived series as fallback.
+  const regionsBal = regions ? accountBalance(regions, allTxns) : (balanceByCode.Regions ?? 0);
+  const fedBal = fidelity ? accountBalance(fidelity, allTxns) : (balanceByCode.FED ?? 0);
+  const ltsBal = lts ? accountBalance(lts, allTxns) : (balanceByCode.LTS ?? 0);
+  const rsuBal = rsu ? accountBalance(rsu, allTxns) : (balanceByCode.RSU ?? 0);
 
-
-  const empty = allBudgets.length === 0 && allAccounts.length === 0 && allSummaries.length === 0;
 
   return (
     <div className="space-y-8">
