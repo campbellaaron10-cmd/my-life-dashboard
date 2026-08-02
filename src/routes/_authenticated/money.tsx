@@ -446,7 +446,7 @@ function FinancesDashboard() {
         onEdit={(s) => { setMonthReport(null); setMonthDialog(s); }}
       />
       <CloseMonthDialog open={closeMonthOpen} onClose={() => setCloseMonthOpen(false)} />
-      <SettingsDialog open={settingsOpen} settingsRow={settings.data ?? null} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog open={settingsOpen} settingsRow={settings.data ?? null} finance={finance} onClose={() => setSettingsOpen(false)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
