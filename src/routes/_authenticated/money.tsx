@@ -295,7 +295,7 @@ function FinancesDashboard() {
       </GlassCard>
 
       {/* Growth chart with mode selector */}
-      <GrowthChart summaries={allSummaries} snapshots={snapshots.data ?? []} />
+      <GrowthChart months={months} snapshots={snapshots.data ?? []} />
 
       {/* Recent activity */}
       <GlassCard>
