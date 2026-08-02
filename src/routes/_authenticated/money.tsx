@@ -1023,6 +1023,20 @@ function MonthDialog({ open, initial, onClose }: { open: boolean; initial: Parti
   );
 }
 
+function MathRow({ label, value, muted, strong, color }: {
+  label: string; value: string; muted?: boolean; strong?: boolean; color?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className={`text-xs ${muted ? "text-muted-foreground" : strong ? "font-semibold text-foreground" : "text-foreground/80"}`}>
+        {color && <span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: color }} />}
+        {label}
+      </span>
+      <span className={strong ? "font-semibold" : muted ? "text-muted-foreground" : ""} style={color ? { color } : undefined}>{value}</span>
+    </div>
+  );
+}
+
 // Full Financial Rules & Settings panel — shows the live math behind every
 // number and lets every input in the formula be edited.
 function SettingsDialog({ open, settingsRow, finance, onClose }: {
@@ -1139,7 +1153,7 @@ function SettingsDialog({ open, settingsRow, finance, onClose }: {
                 <div key={m.month} className="grid grid-cols-[6rem_1fr_1fr_5rem] items-center gap-3 rounded-lg px-2 py-1 text-sm odd:bg-white/[0.03]">
                   <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{monthLabelOf(m.month)}</span>
                   <span className="font-mono text-xs text-muted-foreground">
-                    formula {fmt(m.income - m.housing >= 0 ? m.budget : m.budget)}
+                    {m.budgetIsOverride ? "overridden" : "formula"} {fmt(m.budget)}
                   </span>
                   <Input
                     type="number"
