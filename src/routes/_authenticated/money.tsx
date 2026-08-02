@@ -661,7 +661,7 @@ function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction
   return (
     <div className="group grid grid-cols-[80px_1fr_1fr_110px_120px_32px] items-center gap-3 rounded-xl px-3 py-2.5 transition-all hover:bg-white/5">
       <span className="font-mono text-xs uppercase text-muted-foreground">
-        {new Date(txn.occurred_on).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+        {parseLocalDate(txn.occurred_on).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
       </span>
       <button className="text-left font-medium hover:underline" onClick={onEdit}>{txn.merchant}</button>
       <span className="truncate text-xs text-muted-foreground">{catLabel} · {account?.name ?? "No account"}</span>
