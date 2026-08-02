@@ -446,7 +446,7 @@ function FinancesDashboard() {
         onEdit={(s) => { setMonthReport(null); setMonthDialog(s); }}
       />
       <CloseMonthDialog open={closeMonthOpen} onClose={() => setCloseMonthOpen(false)} />
-      <SettingsDialog open={settingsOpen} settingsRow={settings.data ?? null} onClose={() => setSettingsOpen(false)} />
+      <SettingsDialog open={settingsOpen} settingsRow={settings.data ?? null} finance={finance} onClose={() => setSettingsOpen(false)} />
       <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   );
@@ -1023,8 +1023,28 @@ function MonthDialog({ open, initial, onClose }: { open: boolean; initial: Parti
   );
 }
 
-// Full Financial Rules & Settings panel.
-function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; settingsRow: ReturnType<typeof useFinanceSettings>["data"]; onClose: () => void }) {
+function MathRow({ label, value, muted, strong, color }: {
+  label: string; value: string; muted?: boolean; strong?: boolean; color?: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-4">
+      <span className={`text-xs ${muted ? "text-muted-foreground" : strong ? "font-semibold text-foreground" : "text-foreground/80"}`}>
+        {color && <span className="mr-1.5 inline-block size-2 rounded-full align-middle" style={{ background: color }} />}
+        {label}
+      </span>
+      <span className={strong ? "font-semibold" : muted ? "text-muted-foreground" : ""} style={color ? { color } : undefined}>{value}</span>
+    </div>
+  );
+}
+
+// Full Financial Rules & Settings panel — shows the live math behind every
+// number and lets every input in the formula be edited.
+function SettingsDialog({ open, settingsRow, finance, onClose }: {
+  open: boolean;
+  settingsRow: ReturnType<typeof useFinanceSettings>["data"];
+  finance: ReturnType<typeof useFinanceSummary>;
+  onClose: () => void;
+}) {
   const upsert = useUpsertFinanceSettings();
   const [rules, setRules] = useState<FinanceRules>(DEFAULT_RULES);
   useEffect(() => {
@@ -1034,13 +1054,66 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
   const funTotal = rules.fun_to_vac_pct + rules.fun_to_sts_pct + rules.fun_to_budget_pct;
   const allocTotal = rules.ess_pct + rules.fun_pct + rules.sts_pct;
 
+  const overrides = rules.budget_overrides ?? {};
+  const setOverride = (month: string, v: number | null) => {
+    const next = { ...overrides };
+    if (v == null) delete next[month]; else next[month] = v;
+    setR("budget_overrides", next as any);
+  };
+
+  // Live preview of this month's budget using the percentages currently typed
+  // into this dialog (not yet saved), so the math is visible before saving.
+  const prev = finance.previous;
+  const prevIncome = prev?.income ?? 0;
+  const prevHousing = prev?.housing ?? 0;
+  const prevFunAlloc = prev?.alloc.FUN ?? 0;
+  const prevFunSpent = prev?.spent.FUN ?? 0;
+  const prevFunLeftover = Math.max(0, prevFunAlloc - prevFunSpent);
+  const carry = (prevFunLeftover * rules.fun_to_budget_pct) / 100;
+  const derivedBudget = Math.max(0, prevIncome - prevHousing + carry);
+  const curMonth = finance.current?.month ?? monthKeyOf(new Date());
+  const curOverride = overrides[curMonth];
+  const effectiveBudget = curOverride != null ? curOverride : derivedBudget;
+  const pctOf = (p: number) => (effectiveBudget * p) / 100;
+
+  // Last 12 months of derived budgets, each override-editable.
+  const monthRows = useMemo(() => finance.months.slice(-12).reverse(), [finance.months]);
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="glass-panel max-w-2xl">
+      <DialogContent className="glass-panel max-h-[88vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Financial Rules &amp; Settings</DialogTitle>
         </DialogHeader>
         <div className="space-y-6">
+          <section>
+            <h3 className="mb-2 text-sm font-semibold">This month's budget math</h3>
+            <p className="text-xs text-muted-foreground">
+              Every value below is recomputed live from your transactions and the percentages in this panel.
+            </p>
+            <div className="mt-3 space-y-1 rounded-xl border border-white/10 bg-white/[0.03] p-4 font-mono text-sm">
+              <MathRow label={`${finance.priorMonthLabel} income`} value={fmt(prevIncome)} />
+              <MathRow label={`− ${finance.priorMonthLabel} housing & utilities`} value={`(${fmt(prevHousing)})`} />
+              <MathRow label={`${finance.priorMonthLabel} Fun allocated`} value={fmt(prevFunAlloc)} muted />
+              <MathRow label={`${finance.priorMonthLabel} Fun spent`} value={fmt(prevFunSpent)} muted />
+              <MathRow label={`= leftover Fun`} value={fmt(prevFunLeftover)} muted />
+              <MathRow label={`+ ${rules.fun_to_budget_pct}% of leftover Fun carried forward`} value={fmt(carry)} />
+              <div className="my-2 border-t border-white/10" />
+              <MathRow label="= formula budget" value={fmt(derivedBudget)} strong />
+              {curOverride != null && (
+                <MathRow label="manual override in effect" value={fmt(curOverride)} strong />
+              )}
+              <div className="my-2 border-t border-white/10" />
+              <MathRow label={`Essentials (${rules.ess_pct}%)`} value={fmt(pctOf(rules.ess_pct))} color={SERIES_COLOR.ESS} />
+              <MathRow label={`Fun (${rules.fun_pct}%)`} value={fmt(pctOf(rules.fun_pct))} color={SERIES_COLOR.FUN} />
+              <MathRow label={`Short-Term Savings (${rules.sts_pct}%)`} value={fmt(pctOf(rules.sts_pct))} color={SERIES_COLOR.STS} />
+              <div className="my-2 border-t border-white/10" />
+              <MathRow label={`This month's leftover Fun → Vacation (${rules.fun_to_vac_pct}%)`} value={fmt(((finance.current?.funLeftover ?? 0) * rules.fun_to_vac_pct) / 100)} color={SERIES_COLOR.VAC} />
+              <MathRow label={`This month's leftover Fun → STS (${rules.fun_to_sts_pct}%)`} value={fmt(((finance.current?.funLeftover ?? 0) * rules.fun_to_sts_pct) / 100)} color={SERIES_COLOR.STS} />
+              <MathRow label={`This month's leftover Fun → next budget (${rules.fun_to_budget_pct}%)`} value={fmt(((finance.current?.funLeftover ?? 0) * rules.fun_to_budget_pct) / 100)} />
+            </div>
+          </section>
+
           <section>
             <h3 className="mb-2 text-sm font-semibold">Budget formula</h3>
             <p className="text-xs text-muted-foreground">
@@ -1069,6 +1142,36 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
 
             <p className={`mt-1 text-xs ${funTotal === 100 ? "text-muted-foreground" : "text-warning"}`}>Total: {funTotal}%</p>
           </section>
+
+          <section>
+            <h3 className="mb-2 text-sm font-semibold">Monthly budget overrides</h3>
+            <p className="text-xs text-muted-foreground">
+              Leave blank to use the formula. A value here replaces the starting budget for that month.
+            </p>
+            <div className="mt-3 space-y-1">
+              {monthRows.map((m) => (
+                <div key={m.month} className="grid grid-cols-[6rem_1fr_1fr_5rem] items-center gap-3 rounded-lg px-2 py-1 text-sm odd:bg-white/[0.03]">
+                  <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{monthLabelOf(m.month)}</span>
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {m.budgetIsOverride ? "overridden" : "formula"} {fmt(m.budget)}
+                  </span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="override"
+                    value={overrides[m.month] ?? ""}
+                    onChange={(e) =>
+                      setOverride(m.month, e.target.value === "" ? null : Number(e.target.value))
+                    }
+                  />
+                  {overrides[m.month] != null ? (
+                    <Button variant="ghost" size="sm" onClick={() => setOverride(m.month, null)}>Clear</Button>
+                  ) : <span />}
+                </div>
+              ))}
+            </div>
+          </section>
+
 
           <section>
             <h3 className="mb-2 text-sm font-semibold">Starting balances</h3>
