@@ -130,6 +130,18 @@ function FinancesDashboard() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
+  // Recent activity: default window is the last 120 days, with an optional
+  // custom range and a collapse toggle.
+  const isoDaysAgo = (n: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toISOString().slice(0, 10);
+  };
+  const [activityOpen, setActivityOpen] = useState(true);
+  const [activityFrom, setActivityFrom] = useState(() => isoDaysAgo(120));
+  const [activityTo, setActivityTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [activityCustom, setActivityCustom] = useState(false);
+
   const allTxns = txns.data ?? [];
   const allAccounts = accounts.data ?? [];
   const allBudgets = budgets.data ?? [];
