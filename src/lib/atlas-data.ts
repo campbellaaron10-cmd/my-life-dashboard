@@ -221,12 +221,13 @@ export type MonthlySummaryInsert = Tables["monthly_summaries"]["Insert"];
 
 /** Editable financial rules stored in finance_settings.rules (JSONB). */
 export type FinanceRules = {
-  ess_pct: number;        // % of budget → Essentials
-  fun_pct: number;        // % of budget → Fun
-  sts_pct: number;        // % of budget → Short-Term Savings
-  fun_to_vac_pct: number; // leftover Fun → Vacation
-  fun_to_sts_pct: number; // leftover Fun → Short-Term Savings
-  fun_to_fun_pct: number; // leftover Fun → next month Fun
+  ess_pct: number;           // % of budget → Essentials
+  fun_pct: number;           // % of budget → Fun
+  sts_pct: number;           // % of budget → Short-Term Savings
+  fun_to_vac_pct: number;    // leftover Fun → Vacation
+  fun_to_budget_pct: number; // leftover Fun → next month's budget
+  fun_to_sts_pct: number;    // leftover Fun → Short-Term Savings
+  fun_to_fun_pct?: number;   // legacy (leftover Fun → next month Fun)
   starting_regions: number;
   starting_fed: number;
   starting_lts: number;
@@ -234,14 +235,18 @@ export type FinanceRules = {
   starting_sts: number;
   rounding: "cent" | "dollar";
   auto_close_month: boolean;
+  /** month (YYYY-MM-01) → manual starting-budget override */
+  budget_overrides?: Record<string, number>;
 };
 
 export const DEFAULT_RULES: FinanceRules = {
   ess_pct: 40, fun_pct: 25, sts_pct: 35,
-  fun_to_vac_pct: 70, fun_to_sts_pct: 25, fun_to_fun_pct: 5,
+  fun_to_vac_pct: 80, fun_to_budget_pct: 15, fun_to_sts_pct: 5,
   starting_regions: 0, starting_fed: 0, starting_lts: 0, starting_vac: 0, starting_sts: 0,
   rounding: "cent", auto_close_month: false,
+  budget_overrides: {},
 };
+
 
 export function useFinanceSettings() {
   return useQuery({
