@@ -684,46 +684,47 @@ function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction
 // --- Growth chart ---------------------------------------------------------
 type ChartMode = "balances" | "monthly";
 
-function GrowthChart({ summaries, snapshots }: { summaries: MonthlySummary[]; snapshots: BalanceSnapshot[] }) {
+function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots: BalanceSnapshot[] }) {
   const [mode, setMode] = useState<ChartMode>("balances");
 
-  // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions.
-  // Forward-fill each series so a newly-tracked balance (e.g. RSU added mid-year)
-  // plots as a continuous line instead of dropping to $0 for months that predate it.
+  // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions,
+  // taken from the derived month series so newly-tracked codes (e.g. RSU) plot
+  // as a continuous line instead of dropping to $0.
   const balanceRows = useMemo(() => {
     const last: Record<string, number> = { FED: 0, LTS: 0, RSU: 0, VAC: 0, STS: 0, Regions: 0 };
     const pick = (key: string, raw: number) => {
       if (raw && raw !== 0) last[key] = raw;
       return last[key];
     };
-    return summaries.map((s) => ({
-      date: monthLabel(s.month),
-      FED: pick("FED", Number(s.fed_balance)),
-      LTS: pick("LTS", Number(s.lts_balance)),
-      RSU: pick("RSU", Number((s as any).rsu_balance ?? 0)),
-      VAC: pick("VAC", Number(s.vac_balance)),
-      STS: pick("STS", Number(s.sts_balance)),
-      Regions: pick("Regions", Number(s.regions_balance)),
+    return months.map((m) => ({
+      date: monthLabel(m.month),
+      FED: pick("FED", m.balances.FED),
+      LTS: pick("LTS", m.balances.LTS),
+      RSU: pick("RSU", m.balances.RSU),
+      VAC: pick("VAC", m.balances.VAC),
+      STS: pick("STS", m.balances.STS),
+      Regions: pick("Regions", m.balances.Regions),
     }));
-  }, [summaries]);
+  }, [months]);
   const balanceSeries: (keyof typeof balanceRows[number])[] = ["FED", "LTS", "RSU", "VAC", "STS", "Regions"];
 
   // MONTHLY activity: allocated & spent per category, month by month.
-  const monthlyRows = useMemo(() => summaries.map((s) => ({
-    date: monthLabel(s.month),
-    Housing: Number(s.housing),
-    "ESS spent": Number(s.ess_spent),
-    "FUN spent": Number(s.fun_spent),
-    "STS contrib": Number(s.sts_spent),
-    "LTS contrib": Number(s.lts_contribution),
-  })), [summaries]);
+  const monthlyRows = useMemo(() => months.map((m) => ({
+    date: monthLabel(m.month),
+    Housing: m.housing,
+    "ESS spent": m.spent.ESS,
+    "FUN spent": m.spent.FUN,
+    "STS contrib": m.contrib.STS,
+    "LTS contrib": m.contrib.LTS,
+  })), [months]);
   const monthlySeries = ["Housing", "ESS spent", "FUN spent", "STS contrib", "LTS contrib"];
   const monthlyColors: Record<string, string> = {
     Housing: SERIES_COLOR.HOU, "ESS spent": SERIES_COLOR.ESS, "FUN spent": SERIES_COLOR.FUN,
     "STS contrib": SERIES_COLOR.STS, "LTS contrib": SERIES_COLOR.LTS,
   };
 
-  const isEmpty = summaries.length === 0 && snapshots.length === 0;
+  const isEmpty = months.length === 0 && snapshots.length === 0;
+
 
   return (
     <GlassCard>
