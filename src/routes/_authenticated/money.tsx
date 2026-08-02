@@ -147,6 +147,17 @@ function FinancesDashboard() {
   const allBudgets = budgets.data ?? [];
   const allSummaries = summaries.data ?? [];
 
+  const activityTxns = useMemo(() => {
+    const from = activityFrom;
+    const to = activityTo;
+    return allTxns
+      .filter((t) => {
+        const d = t.occurred_on.slice(0, 10);
+        return (!from || d >= from) && (!to || d <= to);
+      })
+      .sort((a, b) => (a.occurred_on < b.occurred_on ? 1 : -1));
+  }, [allTxns, activityFrom, activityTo]);
+
   // Everything below is derived live by the finance engine: budgets, category
   // allocations, leftover-Fun splits and balances all recompute whenever a
   // transaction (or its date) changes.
