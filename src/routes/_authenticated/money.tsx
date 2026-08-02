@@ -471,23 +471,58 @@ function StatTile({ label, sub, value, hint, onClick, accent }: { label: string;
 }
 
 function MonthlyBudgetCard({
-  budget, budgetIsSet, spent, nextMonthIncome, priorMonthLabel,
+  budget, budgetIsSet, isOverride, spent, nextMonthIncome, priorMonthLabel, previous, rules, onSetBudget,
 }: {
-  budget: number; budgetIsSet: boolean; spent: number; nextMonthIncome: number; priorMonthLabel: string;
+  budget: number; budgetIsSet: boolean; isOverride: boolean; spent: number;
+  nextMonthIncome: number; priorMonthLabel: string;
+  previous: MonthDerived | null; rules: FinanceRules;
+  onSetBudget: (v: number | null) => Promise<void> | void;
 }) {
   const remaining = budget - spent;
   const overspent = remaining < -0.005;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  useEffect(() => { if (editing) setDraft(String(budget.toFixed(2))); }, [editing, budget]);
+
   return (
     <div className="glass-panel rounded-2xl border border-primary/40 p-5">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Starting Budget</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Starting Budget</p>
+        <button
+          className="text-muted-foreground transition-colors hover:text-primary"
+          title="Edit starting budget"
+          onClick={() => setEditing((v) => !v)}
+        >
+          <Pencil className="size-3.5" />
+        </button>
+      </div>
       <p className="mt-2 font-mono text-2xl font-bold">{fmt(budget)}</p>
-      {budgetIsSet ? (
+      {editing ? (
+        <div className="mt-2 space-y-2">
+          <Input
+            type="number"
+            step="0.01"
+            value={draft}
+            autoFocus
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={async () => { await onSetBudget(Number(draft)); setEditing(false); }}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={async () => { await onSetBudget(null); setEditing(false); }}>
+              Use formula
+            </Button>
+          </div>
+        </div>
+      ) : isOverride ? (
+        <p className="mt-1 text-[10px] text-primary">Manual override for this month.</p>
+      ) : budgetIsSet ? (
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Based on {priorMonthLabel} income after month closing.
+          ({priorMonthLabel} income − housing) + {rules.fun_to_budget_pct}% of leftover Fun
+          {previous ? ` = ${fmt(Math.max(0, previous.income - previous.housing))} + ${fmt(previous.leftoverToBudget)}` : ""}.
         </p>
       ) : (
         <p className="mt-1 text-[10px] text-warning">
-          Not set — close prior month to establish this month's budget.
+          No {priorMonthLabel} income logged yet — add income or set the budget manually.
         </p>
       )}
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
@@ -503,16 +538,17 @@ function MonthlyBudgetCard({
       )}
       <div className="mt-3 border-t border-white/10 pt-2 text-xs">
         <div className="grid grid-cols-2 gap-x-3">
-          <span className="text-muted-foreground">Next Month Income</span>
+          <span className="text-muted-foreground">Income this month</span>
           <span className="text-right font-mono text-primary">{fmt(nextMonthIncome)}</span>
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Income earned this month becomes next month's budget after closing.
+          Income earned this month, minus housing, becomes next month's budget.
         </p>
       </div>
     </div>
   );
 }
+
 
 
 function BudgetRow({
