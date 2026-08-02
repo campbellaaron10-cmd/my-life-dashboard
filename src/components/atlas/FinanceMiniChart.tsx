@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { SERIES_COLOR, monthLabel } from "@/lib/finance-summary";
-import type { MonthlySummary } from "@/lib/atlas-data";
+import type { MonthDerived } from "@/lib/finance-engine";
 
 const CHART = {
   axis: "rgba(226, 232, 240, 0.7)",
@@ -16,31 +16,32 @@ const fmt = (n: number) =>
   n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 
 export function FinanceMiniChart({
-  summaries,
+  months,
   compact = false,
 }: {
-  summaries: MonthlySummary[];
+  months: MonthDerived[];
   compact?: boolean;
 }) {
   const rows = useMemo(() => {
-    // Forward-fill so recently-added balance columns (e.g. RSU) don't drop to
+    // Forward-fill so recently-added balance codes (e.g. RSU) don't drop to
     // zero for months that predate them.
     const last: Record<string, number> = { FED: 0, LTS: 0, RSU: 0, VAC: 0, STS: 0 };
-    const pick = (k: keyof typeof last, v: number) => {
+    const pick = (k: string, v: number) => {
       if (v && v !== 0) last[k] = v;
       return last[k];
     };
-    return summaries.map((s) => ({
-      date: monthLabel(s.month),
-      FED: pick("FED", Number(s.fed_balance)),
-      LTS: pick("LTS", Number(s.lts_balance)),
-      RSU: pick("RSU", Number((s as any).rsu_balance ?? 0)),
-      VAC: pick("VAC", Number(s.vac_balance)),
-      STS: pick("STS", Number(s.sts_balance)),
+    return months.map((m) => ({
+      date: monthLabel(m.month),
+      FED: pick("FED", m.balances.FED),
+      LTS: pick("LTS", m.balances.LTS),
+      RSU: pick("RSU", m.balances.RSU),
+      VAC: pick("VAC", m.balances.VAC),
+      STS: pick("STS", m.balances.STS),
     }));
-  }, [summaries]);
+  }, [months]);
 
   const height = compact ? "h-24" : "h-40";
+
 
   if (rows.length === 0) {
     return (

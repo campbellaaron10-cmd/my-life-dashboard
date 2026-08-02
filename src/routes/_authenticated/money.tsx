@@ -29,6 +29,9 @@ import {
   type Account, type Transaction, type BudgetCategory, type BalanceSnapshot, type MonthlySummary,
 } from "@/lib/atlas-data";
 import { PrivacyGuard } from "@/context/PrivacyMode";
+import { useFinanceSummary, resolveRules } from "@/lib/finance-summary";
+import { monthKeyOf, monthLabel as monthLabelOf, parseLocalDate, type MonthDerived } from "@/lib/finance-engine";
+
 
 export const Route = createFileRoute("/_authenticated/money")({
   head: () => ({ meta: [{ title: "Finances — Atlas" }] }),
@@ -63,13 +66,12 @@ const CATEGORY_LABELS: Record<string, { long: string; short: string }> = {
   RSU: { long: "Restricted Stock Units", short: "RSU" },
 };
 
-const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const fmt2 = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
-const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-const monthLabel = (iso: string) => {
-  const [y, m] = iso.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
-};
+// Finance module always shows cents (the dashboard rounds to whole dollars).
+const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt2 = fmt;
+const monthKey = monthKeyOf;
+const monthLabel = monthLabelOf;
+
 
 // Higher-contrast chart tokens (used inline so the values are literal for Recharts).
 const CHART = {
@@ -117,6 +119,7 @@ function FinancesDashboard() {
   const snapshots = useBalanceSnapshots();
   const summaries = useMonthlySummaries();
   const seed = useSeedFinanceDefaults();
+  const upsertSettings = useUpsertFinanceSettings();
 
   const [txnDialog, setTxnDialog] = useState<Partial<Transaction> | null>(null);
   const [budgetDialog, setBudgetDialog] = useState<Partial<BudgetCategory> | null>(null);
@@ -132,125 +135,54 @@ function FinancesDashboard() {
   const allBudgets = budgets.data ?? [];
   const allSummaries = summaries.data ?? [];
 
-  const rules: FinanceRules = { ...DEFAULT_RULES, ...((settings.data?.rules ?? {}) as Partial<FinanceRules>) };
+  // Everything below is derived live by the finance engine: budgets, category
+  // allocations, leftover-Fun splits and balances all recompute whenever a
+  // transaction (or its date) changes.
+  const finance = useFinanceSummary();
+  const rules = finance.rules;
+  const months = finance.months;
+  const netWorth = finance.netWorth;
 
-  // Net worth = accounts + summary-balance fallbacks for codes that don't
-  // have a real account row yet (RSU, Fidelity, LTS, VAC, STS, Regions).
-  const netWorth = useMemo(() => {
-    const accountsTotal = allAccounts.reduce((s, a) => s + accountBalance(a, allTxns), 0);
-    const latest = allSummaries.at(-1);
-    const has = (re: RegExp, type?: Account["type"]) =>
-      allAccounts.some((a) => re.test(a.name) || (type ? a.type === type : false));
-    const fallback =
-      (has(/regions/i, "checking") ? 0 : Number(latest?.regions_balance ?? 0)) +
-      (has(/fidelity|brokerage/i, "investment") ? 0 : Number(latest?.fed_balance ?? 0)) +
-      (has(/401|retirement/i, "retirement") ? 0 : Number(latest?.lts_balance ?? 0)) +
-      (has(/rsu|stock|equity/i) ? 0 : Number((latest as any)?.rsu_balance ?? 0)) +
-      (has(/vacation|\bvac\b/i) ? 0 : Number(latest?.vac_balance ?? 0)) +
-      (has(/short.?term|\bsts\b/i) ? 0 : Number(latest?.sts_balance ?? 0));
-    return accountsTotal + fallback;
-  }, [allAccounts, allTxns, allSummaries]);
-
-  // Current + previous month markers.
   const now = new Date();
-  const monthStart = useMemo(() => new Date(now.getFullYear(), now.getMonth(), 1), []);
-  const nextMonthStart = useMemo(() => new Date(now.getFullYear(), now.getMonth() + 1, 1), []);
-  const prevMonthKey = useMemo(() => monthKey(new Date(now.getFullYear(), now.getMonth() - 1, 1)), []);
-  const curMonthKey = monthKey(monthStart);
+  const curMonthKey = monthKey(now);
+  const cur: MonthDerived | null = finance.current;
 
-  const monthlyIncome = useMemo(
-    () => allTxns
-      .filter((t) => t.type === "income" && new Date(t.occurred_on) >= monthStart && new Date(t.occurred_on) < nextMonthStart)
-      .reduce((s, t) => s + Number(t.amount), 0),
-    [allTxns, monthStart, nextMonthStart],
-  );
+  const monthlyIncome = finance.nextMonthIncome;
+  const monthlyBudget = finance.monthlyBudget;
+  const budgetIsSet = finance.budgetIsSet;
+  const monthlySpent = finance.monthlySpent;
+  const priorMonthLabel = finance.priorMonthLabel;
 
-  // Current-month budget comes from the stored monthly summary created when
-  // the prior month was closed. Do NOT invent one from prior income/housing —
-  // the workbook rule is applied by the Close-Month workflow, not here.
-  void prevMonthKey;
-  const currentSummary = allSummaries.find((s) => s.month === curMonthKey);
-  const monthlyBudget = currentSummary ? Number(currentSummary.budget) : 0;
-  const budgetIsSet = !!currentSummary;
-
-  // Spending per spending-category — sourced from the imported monthly
-  // summary when present, falling back to live transactions.
-  const summarySpentByCode: Record<string, number> = {
-    HOU: Number(currentSummary?.housing ?? 0),
-    ESS: Number(currentSummary?.ess_spent ?? 0),
-    FUN: Number(currentSummary?.fun_spent ?? 0),
-  };
-  // Savings / investment "actual contribution this month" from the summary.
-  const summaryContribByCode: Record<string, number> = {
-    STS: Number(currentSummary?.sts_spent ?? 0),
-    LTS: Number(currentSummary?.lts_contribution ?? 0),
-    FED: Number(currentSummary?.fed_earnings ?? 0),
-    RSU: Number(currentSummary?.rsu_contribution ?? 0),
-  };
-  // Planned allocation overrides from the summary (per workbook plan).
-  const summaryAllocByCode: Record<string, number> = {
-    HOU: Number(currentSummary?.housing ?? 0),
-    ESS: Number(currentSummary?.ess_allocated ?? 0),
-    FUN: Number(currentSummary?.fun_allocated ?? 0),
-    STS: Number(currentSummary?.sts_allocated ?? 0),
-  };
-
-  // Contribution this month, per category: sum of savings_contribution /
-  // investment_contribution transactions tagged to that category.
-  const contributionByCat = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const t of allTxns) {
-      if (!t.category_id) continue;
-      if (t.type !== "savings_contribution" && t.type !== "investment_contribution") continue;
-      const d = new Date(t.occurred_on);
-      if (d < monthStart || d >= nextMonthStart) continue;
-      map.set(t.category_id, (map.get(t.category_id) ?? 0) + Number(t.amount));
-    }
-    return map;
-  }, [allTxns, monthStart, nextMonthStart]);
-
-  // Cumulative balance per savings/investment code — sourced from the latest
-  // monthly summary. Never treated as a current-month allocation.
-  const latestSummary = allSummaries.at(-1);
-  const balanceByCode: Record<string, number> = {
-    STS: Number(latestSummary?.sts_balance ?? 0),
-    VAC: Number(latestSummary?.vac_balance ?? 0),
-    LTS: Number(latestSummary?.lts_balance ?? 0),
-    FED: Number(latestSummary?.fed_balance ?? 0),
-    RSU: Number((latestSummary as any)?.rsu_balance ?? 0),
-  };
-
-  // Total spent this month — prefer imported summary sums, else live txns.
-  const summarySpendTotal =
-    summarySpentByCode.HOU + summarySpentByCode.ESS + summarySpentByCode.FUN;
-  const liveMonthlySpent = useMemo(
-    () => allTxns
-      .filter((t) => t.type === "expense" && new Date(t.occurred_on) >= monthStart && new Date(t.occurred_on) < nextMonthStart)
-      .reduce((s, t) => s + Number(t.amount), 0),
-    [allTxns, monthStart, nextMonthStart],
-  );
-  const monthlySpent = summarySpendTotal > 0 ? summarySpendTotal : liveMonthlySpent;
-
-  const priorMonthLabel = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    .toLocaleString("en-US", { month: "long" });
-
-
+  const spentByCode = finance.spentByCode;
+  const allocByCode = finance.allocByCode;
+  const contribByCode = finance.contribByCode;
+  const balanceByCode = finance.balanceByCode;
 
   const findAcc = (nameFragment: string) =>
     allAccounts.find((a) => a.name.toLowerCase().includes(nameFragment.toLowerCase()));
   const regions = findAcc("regions") ?? allAccounts.find((a) => a.type === "checking");
   const fidelity = findAcc("fidelity") ?? allAccounts.find((a) => a.type === "investment");
   const lts = findAcc("401") ?? allAccounts.find((a) => a.type === "retirement");
-  const rsu = findAcc("rsu") ?? findAcc("stock");
+  const rsu = findAcc("rsu") ?? findAcc("stock") ?? findAcc("restricted");
 
-  // Live account balances (with monthly-summary fallback derived above).
-  const regionsBal = regions ? accountBalance(regions, allTxns) : Number(latestSummary?.regions_balance ?? 0);
-  const fedBal = fidelity ? accountBalance(fidelity, allTxns) : balanceByCode.FED;
-  const ltsBal = lts ? accountBalance(lts, allTxns) : balanceByCode.LTS;
-  const rsuBal = rsu ? accountBalance(rsu, allTxns) : balanceByCode.RSU;
+  // Live account balances, with the derived series as fallback.
+  const regionsBal = regions ? accountBalance(regions, allTxns) : (balanceByCode.Regions ?? 0);
+  const fedBal = fidelity ? accountBalance(fidelity, allTxns) : (balanceByCode.FED ?? 0);
+  const ltsBal = lts ? accountBalance(lts, allTxns) : (balanceByCode.LTS ?? 0);
+  const rsuBal = rsu ? accountBalance(rsu, allTxns) : (balanceByCode.RSU ?? 0);
 
+  // Manual starting-budget override for the current month (stored in rules).
+  const setBudgetOverride = async (v: number | null) => {
+    const next = { ...(rules.budget_overrides ?? {}) };
+    if (v == null) delete next[curMonthKey];
+    else next[curMonthKey] = v;
+    await upsertSettings.mutateAsync({ rules: { ...rules, budget_overrides: next } as any });
+  };
 
   const empty = allBudgets.length === 0 && allAccounts.length === 0 && allSummaries.length === 0;
+
+
+
 
   return (
     <div className="space-y-8">
@@ -321,9 +253,14 @@ function FinancesDashboard() {
         <MonthlyBudgetCard
           budget={monthlyBudget}
           budgetIsSet={budgetIsSet}
+          isOverride={finance.budgetIsOverride}
           spent={monthlySpent}
           nextMonthIncome={monthlyIncome}
           priorMonthLabel={priorMonthLabel}
+          previous={finance.previous}
+          rules={rules}
+          onSetBudget={setBudgetOverride}
+
         />
 
       </div>
@@ -358,9 +295,10 @@ function FinancesDashboard() {
                 key={c.id}
                 cat={c}
                 txns={allTxns}
-                contribution={Math.max(contributionByCat.get(c.id) ?? 0, summaryContribByCode[c.code] ?? 0)}
-                summarySpent={summarySpentByCode[c.code]}
-                summaryAllocation={summaryAllocByCode[c.code]}
+                contribution={contribByCode[c.code] ?? 0}
+                spent={spentByCode[c.code] ?? 0}
+                allocation={allocByCode[c.code] ?? 0}
+
                 balance={balanceByCode[c.code] ?? 0}
                 onEdit={() => setBudgetDialog(c)}
               />
@@ -372,7 +310,7 @@ function FinancesDashboard() {
       </GlassCard>
 
       {/* Growth chart with mode selector */}
-      <GrowthChart summaries={allSummaries} snapshots={snapshots.data ?? []} />
+      <GrowthChart months={months} snapshots={snapshots.data ?? []} />
 
       {/* Recent activity */}
       <GlassCard>
@@ -533,23 +471,58 @@ function StatTile({ label, sub, value, hint, onClick, accent }: { label: string;
 }
 
 function MonthlyBudgetCard({
-  budget, budgetIsSet, spent, nextMonthIncome, priorMonthLabel,
+  budget, budgetIsSet, isOverride, spent, nextMonthIncome, priorMonthLabel, previous, rules, onSetBudget,
 }: {
-  budget: number; budgetIsSet: boolean; spent: number; nextMonthIncome: number; priorMonthLabel: string;
+  budget: number; budgetIsSet: boolean; isOverride: boolean; spent: number;
+  nextMonthIncome: number; priorMonthLabel: string;
+  previous: MonthDerived | null; rules: FinanceRules;
+  onSetBudget: (v: number | null) => Promise<void> | void;
 }) {
   const remaining = budget - spent;
   const overspent = remaining < -0.005;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  useEffect(() => { if (editing) setDraft(String(budget.toFixed(2))); }, [editing, budget]);
+
   return (
     <div className="glass-panel rounded-2xl border border-primary/40 p-5">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Starting Budget</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Starting Budget</p>
+        <button
+          className="text-muted-foreground transition-colors hover:text-primary"
+          title="Edit starting budget"
+          onClick={() => setEditing((v) => !v)}
+        >
+          <Pencil className="size-3.5" />
+        </button>
+      </div>
       <p className="mt-2 font-mono text-2xl font-bold">{fmt(budget)}</p>
-      {budgetIsSet ? (
+      {editing ? (
+        <div className="mt-2 space-y-2">
+          <Input
+            type="number"
+            step="0.01"
+            value={draft}
+            autoFocus
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={async () => { await onSetBudget(Number(draft)); setEditing(false); }}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={async () => { await onSetBudget(null); setEditing(false); }}>
+              Use formula
+            </Button>
+          </div>
+        </div>
+      ) : isOverride ? (
+        <p className="mt-1 text-[10px] text-primary">Manual override for this month.</p>
+      ) : budgetIsSet ? (
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Based on {priorMonthLabel} income after month closing.
+          ({priorMonthLabel} income − housing) + {rules.fun_to_budget_pct}% of leftover Fun
+          {previous ? ` = ${fmt(Math.max(0, previous.income - previous.housing))} + ${fmt(previous.leftoverToBudget)}` : ""}.
         </p>
       ) : (
         <p className="mt-1 text-[10px] text-warning">
-          Not set — close prior month to establish this month's budget.
+          No {priorMonthLabel} income logged yet — add income or set the budget manually.
         </p>
       )}
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
@@ -565,11 +538,11 @@ function MonthlyBudgetCard({
       )}
       <div className="mt-3 border-t border-white/10 pt-2 text-xs">
         <div className="grid grid-cols-2 gap-x-3">
-          <span className="text-muted-foreground">Next Month Income</span>
+          <span className="text-muted-foreground">Income this month</span>
           <span className="text-right font-mono text-primary">{fmt(nextMonthIncome)}</span>
         </div>
         <p className="mt-1 text-[10px] text-muted-foreground">
-          Income earned this month becomes next month's budget after closing.
+          Income earned this month, minus housing, becomes next month's budget.
         </p>
       </div>
     </div>
@@ -577,22 +550,22 @@ function MonthlyBudgetCard({
 }
 
 
+
 function BudgetRow({
-  cat, txns, contribution, balance, summarySpent, summaryAllocation, onEdit,
+  cat, txns, contribution, balance, spent: spentProp, allocation, onEdit,
 }: {
   cat: BudgetCategory;
   txns: Transaction[];
   contribution: number;
   balance: number;
-  summarySpent?: number;
-  summaryAllocation?: number;
+  spent?: number;
+  allocation?: number;
   onEdit: () => void;
 }) {
   const liveSpent = budgetSpent(cat, txns);
-  const spent = (summarySpent && summarySpent > 0) ? summarySpent : liveSpent;
-  const limit = (summaryAllocation && summaryAllocation > 0)
-    ? summaryAllocation
-    : Number(cat.monthly_limit);
+  const spent = spentProp != null && spentProp > 0 ? spentProp : liveSpent;
+  // Allocation is derived from this month's budget × the category percentage.
+  const limit = allocation != null && allocation > 0 ? allocation : Number(cat.monthly_limit);
   const goal = cat.goal_amount ? Number(cat.goal_amount) : null;
   const label = CATEGORY_LABELS[cat.code] ?? { long: cat.name, short: cat.code };
   const accent = (cat.color && cat.color.startsWith("#")) ? cat.color : (SERIES_COLOR[cat.code] ?? "hsl(var(--primary))");
@@ -603,8 +576,6 @@ function BudgetRow({
   // derived from (income − housing). Show spend only, no bar/remaining/%.
   const isHousing = cat.code === "HOU";
 
-  // Spending: bar tracks spent vs monthly allocation.
-  // Savings/investment: bar tracks actual contribution vs planned contribution (or goal for savings).
   let barValue = 0;
   let barMax = 0;
   let headline = "";
@@ -617,14 +588,11 @@ function BudgetRow({
   } else {
     barValue = contribution;
     barMax = limit > 0 ? limit : (goal ?? 0);
-    headline = limit > 0
-      ? `${fmt(contribution)} / ${fmt(limit)} planned`
-      : `${fmt(contribution)} contributed`;
+    headline = `${fmt(contribution)} contributed`;
   }
   const pct = barMax > 0 ? Math.min(100, (barValue / barMax) * 100) : 0;
   const overspent = isSpending && !isHousing && limit > 0 && spent > limit;
   const goalPct = goal && goal > 0 ? Math.min(100, (balance / goal) * 100) : null;
-
 
   return (
     <button
@@ -663,8 +631,6 @@ function BudgetRow({
         </div>
       ) : (
         <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>Planned contribution</span>
-          <span className="text-right font-mono">{fmt(limit)}</span>
           <span>Actual this month</span>
           <span className="text-right font-mono">{fmt(contribution)}</span>
           <span>Current balance</span>
@@ -688,13 +654,14 @@ function BudgetRow({
 }
 
 
+
 function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction; account?: Account; category?: BudgetCategory; isCredit: boolean; onEdit: () => void }) {
   const del = useDeleteTransaction();
   const catLabel = category ? (CATEGORY_LABELS[category.code]?.long ?? category.name) : "Uncategorized";
   return (
     <div className="group grid grid-cols-[80px_1fr_1fr_110px_120px_32px] items-center gap-3 rounded-xl px-3 py-2.5 transition-all hover:bg-white/5">
       <span className="font-mono text-xs uppercase text-muted-foreground">
-        {new Date(txn.occurred_on).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+        {parseLocalDate(txn.occurred_on).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
       </span>
       <button className="text-left font-medium hover:underline" onClick={onEdit}>{txn.merchant}</button>
       <span className="truncate text-xs text-muted-foreground">{catLabel} · {account?.name ?? "No account"}</span>
@@ -717,46 +684,47 @@ function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction
 // --- Growth chart ---------------------------------------------------------
 type ChartMode = "balances" | "monthly";
 
-function GrowthChart({ summaries, snapshots }: { summaries: MonthlySummary[]; snapshots: BalanceSnapshot[] }) {
+function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots: BalanceSnapshot[] }) {
   const [mode, setMode] = useState<ChartMode>("balances");
 
-  // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions.
-  // Forward-fill each series so a newly-tracked balance (e.g. RSU added mid-year)
-  // plots as a continuous line instead of dropping to $0 for months that predate it.
+  // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions,
+  // taken from the derived month series so newly-tracked codes (e.g. RSU) plot
+  // as a continuous line instead of dropping to $0.
   const balanceRows = useMemo(() => {
     const last: Record<string, number> = { FED: 0, LTS: 0, RSU: 0, VAC: 0, STS: 0, Regions: 0 };
     const pick = (key: string, raw: number) => {
       if (raw && raw !== 0) last[key] = raw;
       return last[key];
     };
-    return summaries.map((s) => ({
-      date: monthLabel(s.month),
-      FED: pick("FED", Number(s.fed_balance)),
-      LTS: pick("LTS", Number(s.lts_balance)),
-      RSU: pick("RSU", Number((s as any).rsu_balance ?? 0)),
-      VAC: pick("VAC", Number(s.vac_balance)),
-      STS: pick("STS", Number(s.sts_balance)),
-      Regions: pick("Regions", Number(s.regions_balance)),
+    return months.map((m) => ({
+      date: monthLabel(m.month),
+      FED: pick("FED", m.balances.FED),
+      LTS: pick("LTS", m.balances.LTS),
+      RSU: pick("RSU", m.balances.RSU),
+      VAC: pick("VAC", m.balances.VAC),
+      STS: pick("STS", m.balances.STS),
+      Regions: pick("Regions", m.balances.Regions),
     }));
-  }, [summaries]);
+  }, [months]);
   const balanceSeries: (keyof typeof balanceRows[number])[] = ["FED", "LTS", "RSU", "VAC", "STS", "Regions"];
 
   // MONTHLY activity: allocated & spent per category, month by month.
-  const monthlyRows = useMemo(() => summaries.map((s) => ({
-    date: monthLabel(s.month),
-    Housing: Number(s.housing),
-    "ESS spent": Number(s.ess_spent),
-    "FUN spent": Number(s.fun_spent),
-    "STS contrib": Number(s.sts_spent),
-    "LTS contrib": Number(s.lts_contribution),
-  })), [summaries]);
+  const monthlyRows = useMemo(() => months.map((m) => ({
+    date: monthLabel(m.month),
+    Housing: m.housing,
+    "ESS spent": m.spent.ESS,
+    "FUN spent": m.spent.FUN,
+    "STS contrib": m.contrib.STS,
+    "LTS contrib": m.contrib.LTS,
+  })), [months]);
   const monthlySeries = ["Housing", "ESS spent", "FUN spent", "STS contrib", "LTS contrib"];
   const monthlyColors: Record<string, string> = {
     Housing: SERIES_COLOR.HOU, "ESS spent": SERIES_COLOR.ESS, "FUN spent": SERIES_COLOR.FUN,
     "STS contrib": SERIES_COLOR.STS, "LTS contrib": SERIES_COLOR.LTS,
   };
 
-  const isEmpty = summaries.length === 0 && snapshots.length === 0;
+  const isEmpty = months.length === 0 && snapshots.length === 0;
+
 
   return (
     <GlassCard>
@@ -1060,18 +1028,10 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
   const upsert = useUpsertFinanceSettings();
   const [rules, setRules] = useState<FinanceRules>(DEFAULT_RULES);
   useEffect(() => {
-    if (settingsRow) {
-      setRules({
-        ...DEFAULT_RULES,
-        ...((settingsRow.rules ?? {}) as Partial<FinanceRules>),
-        fun_to_vac_pct: Number(settingsRow.fun_to_vacation_pct ?? DEFAULT_RULES.fun_to_vac_pct),
-        fun_to_sts_pct: Number(settingsRow.fun_to_sts_pct ?? DEFAULT_RULES.fun_to_sts_pct),
-        fun_to_fun_pct: Number(settingsRow.fun_to_fun_pct ?? DEFAULT_RULES.fun_to_fun_pct),
-      });
-    }
+    if (settingsRow) setRules(resolveRules(settingsRow.rules));
   }, [settingsRow, open]);
   const setR = <K extends keyof FinanceRules>(k: K, v: FinanceRules[K]) => setRules({ ...rules, [k]: v });
-  const funTotal = rules.fun_to_vac_pct + rules.fun_to_sts_pct + rules.fun_to_fun_pct;
+  const funTotal = rules.fun_to_vac_pct + rules.fun_to_sts_pct + rules.fun_to_budget_pct;
   const allocTotal = rules.ess_pct + rules.fun_pct + rules.sts_pct;
 
   return (
@@ -1084,8 +1044,9 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
           <section>
             <h3 className="mb-2 text-sm font-semibold">Budget formula</h3>
             <p className="text-xs text-muted-foreground">
-              Budget = prior month Income − prior month Housing &amp; Utilities. That budget flows into
-              Essentials, Fun, and Short-Term Savings by the percentages below.
+              Budget = (prior month Income − prior month Housing &amp; Utilities) + {rules.fun_to_budget_pct}% of
+              prior month's leftover Fun money. That budget splits into Essentials, Fun, and
+              Short-Term Savings by the percentages below.
             </p>
             <div className="mt-3 grid grid-cols-3 gap-3">
               <Field label="Essentials %"><Input type="number" value={rules.ess_pct} onChange={(e) => setR("ess_pct", Number(e.target.value))} /></Field>
@@ -1103,8 +1064,9 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
             <div className="mt-3 grid grid-cols-3 gap-3">
               <Field label="→ Vacation Fund %"><Input type="number" value={rules.fun_to_vac_pct} onChange={(e) => setR("fun_to_vac_pct", Number(e.target.value))} /></Field>
               <Field label="→ Short-Term Savings %"><Input type="number" value={rules.fun_to_sts_pct} onChange={(e) => setR("fun_to_sts_pct", Number(e.target.value))} /></Field>
-              <Field label="→ Next month Fun %"><Input type="number" value={rules.fun_to_fun_pct} onChange={(e) => setR("fun_to_fun_pct", Number(e.target.value))} /></Field>
+              <Field label="→ Next month's budget %"><Input type="number" value={rules.fun_to_budget_pct} onChange={(e) => setR("fun_to_budget_pct", Number(e.target.value))} /></Field>
             </div>
+
             <p className={`mt-1 text-xs ${funTotal === 100 ? "text-muted-foreground" : "text-warning"}`}>Total: {funTotal}%</p>
           </section>
 
@@ -1144,7 +1106,7 @@ function SettingsDialog({ open, settingsRow, onClose }: { open: boolean; setting
               rules: rules as any,
               fun_to_vacation_pct: rules.fun_to_vac_pct,
               fun_to_sts_pct: rules.fun_to_sts_pct,
-              fun_to_fun_pct: rules.fun_to_fun_pct,
+              fun_to_fun_pct: rules.fun_to_budget_pct,
             });
             onClose();
           }}>Save</Button>

@@ -291,7 +291,7 @@ function Dashboard() {
                 </p>
                 <span className="text-[10px] text-primary">Open full chart →</span>
               </div>
-              <FinanceMiniChart summaries={finance.summaries.slice(-6)} compact />
+              <FinanceMiniChart months={finance.months.slice(-6)} compact />
             </Link>
           </GlassCard>
         </PrivacyGuard>
