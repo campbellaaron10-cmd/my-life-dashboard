@@ -1,0 +1,318 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.1",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://sykswoylbhslyjrhsuvj.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "my-life-dashboard",
+      "version": "0.1.0",
+      "title": "My Life Dashboard"
+    },
+    "tools": [
+      {
+        "name": "search_vault",
+        "title": "Search knowledge vault",
+        "description": "Search the user's Knowledge Vault (long-term memory: home, vehicles, travel, finance, reference notes, guides, documents, warranties) by free text, life area, or template.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Free text matched against title, subtitle and notes."
+            },
+            "area": {
+              "type": "string",
+              "description": "Life area filter, e.g. home, vehicles, travel, finance, outdoor, reference."
+            },
+            "template": {
+              "type": "string",
+              "description": "Template filter, e.g. note, vehicle, document."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max rows to return (default 20, max 100)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_vault_entry",
+        "title": "Get vault entry",
+        "description": "Read one Knowledge Vault entry in full, including its structured fields, child entries (warranties, documents) and reminders.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Vault entry id."
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_vault_note",
+        "title": "Create vault note",
+        "description": "Save a new note or guide into the Knowledge Vault so it becomes long-term memory. Use search_vault first to avoid duplicating an existing entry.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "Short authoritative title, e.g. 'HVAC filter size'."
+            },
+            "notes": {
+              "type": "string",
+              "description": "Body of the note or procedure, markdown allowed."
+            },
+            "subtitle": {
+              "type": "string",
+              "description": "One-line summary shown on the card."
+            },
+            "area": {
+              "type": "string",
+              "description": "Life area: home, vehicles, travel, finance, outdoor, projects, reference."
+            },
+            "template": {
+              "type": "string",
+              "description": "Template: note or guide. Defaults to note."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Reusable tag chips."
+            },
+            "parent_id": {
+              "type": "string",
+              "description": "Attach this entry to a parent vault entry."
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_tasks",
+        "title": "List tasks",
+        "description": "List the user's tasks — the action engine. Filter by completion, due date window, or free text.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "include_done": {
+              "type": "boolean",
+              "description": "Include completed tasks (default false)."
+            },
+            "due_before": {
+              "type": "string",
+              "description": "Only tasks due on or before this ISO date."
+            },
+            "query": {
+              "type": "string",
+              "description": "Free text matched against task title."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max rows (default 30, max 100)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_task",
+        "title": "Create task",
+        "description": "Add a task to the user's task list, optionally with a due date and priority.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "What needs to be done."
+            },
+            "notes": {
+              "type": "string",
+              "description": "Extra detail."
+            },
+            "due_on": {
+              "type": "string",
+              "description": "Due date as an ISO date (YYYY-MM-DD)."
+            },
+            "priority": {
+              "type": "string",
+              "description": "Priority label, e.g. low, normal, high."
+            },
+            "category": {
+              "type": "string",
+              "description": "Free-form category label."
+            }
+          },
+          "required": [
+            "title"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "complete_task",
+        "title": "Complete task",
+        "description": "Mark a task as done (or reopen it) by task id.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Task id."
+            },
+            "done": {
+              "type": "boolean",
+              "description": "Set false to reopen the task. Default true."
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_trips",
+        "title": "List trips",
+        "description": "List the user's trips — upcoming plans and past memories with dates, destination, budget and notes.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "description": "Filter by trip status, e.g. planning, upcoming, completed."
+            },
+            "query": {
+              "type": "string",
+              "description": "Free text matched against trip name and destination."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max rows (default 20, max 100)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_upcoming_reminders",
+        "title": "List upcoming reminders",
+        "description": "List Knowledge Vault reminders (warranty expirations, renewals, filter changes, maintenance) firing within a number of days.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "within_days": {
+              "type": "integer",
+              "description": "Look-ahead window in days, default 60."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max rows (default 50, max 100)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_pantry_items",
+        "title": "List pantry items",
+        "description": "List what is in the user's kitchen right now, optionally only items expiring within a number of days.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "expiring_within_days": {
+              "type": "integer",
+              "description": "Only items with an expiry date within this many days."
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Max rows (default 50, max 200)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}
