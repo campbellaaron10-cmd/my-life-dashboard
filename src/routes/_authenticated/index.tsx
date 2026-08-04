@@ -13,7 +13,8 @@ import {
 } from "@/lib/atlas-data";
 import { useFinanceSummary, SERIES_COLOR, CATEGORY_LABELS } from "@/lib/finance-summary";
 import { useSavedLocation, useWeather, weatherCondition, useSavedTimeZone } from "@/hooks/useWeather";
-import { PrivacyGuard, usePrivacyMode } from "@/context/PrivacyMode";
+import { usePrivacyMode } from "@/context/PrivacyMode";
+import { maskMoney } from "@/lib/privacy-mask";
 import { SourceBadge } from "@/lib/task-sources";
 
 export const Route = createFileRoute("/_authenticated/")({
