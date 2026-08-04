@@ -29,7 +29,7 @@ import {
   type Account, type Transaction, type BudgetCategory, type BalanceSnapshot, type MonthlySummary,
 } from "@/lib/atlas-data";
 import { usePrivacyMode } from "@/context/PrivacyMode";
-import { maskMoney } from "@/lib/privacy-mask";
+import { maskMoney, isMoneyMasked } from "@/lib/privacy-mask";
 import { useFinanceSummary, resolveRules } from "@/lib/finance-summary";
 import { monthKeyOf, monthLabel as monthLabelOf, parseLocalDate, type MonthDerived } from "@/lib/finance-engine";
 
