@@ -232,17 +232,8 @@ function Dashboard() {
 
       <div className="grid grid-cols-12 gap-6">
         {/* Financial Core — summary only, mirrors Finances module */}
-        <PrivacyGuard
-          sensitivity="private-only"
-          fallback={
-            <GlassCard className="col-span-12 lg:col-span-8">
-              <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
-                <Wallet className="size-8 opacity-40" />
-                <p>Finance hidden in Guest mode.</p>
-              </div>
-            </GlassCard>
-          }
-        >
+        <>
+
           <GlassCard className="col-span-12 lg:col-span-8">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
