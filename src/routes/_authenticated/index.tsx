@@ -294,7 +294,7 @@ function Dashboard() {
               )}
             </Link>
           </GlassCard>
-        </PrivacyGuard>
+        </>
 
         {/* Tasks — promoted next to Financial Core; will grow as Tasks matures. */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-4">
