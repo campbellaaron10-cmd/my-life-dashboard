@@ -54,6 +54,10 @@ export function PrivacyModeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  // Keep the money-mask flag in sync during render, before children read it.
+  setMoneyMasked(mode !== "private");
+
+
   const canShow = useCallback(
     (s: Sensitivity) => {
       if (s === "guest-safe") return true;
