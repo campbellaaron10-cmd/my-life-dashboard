@@ -797,6 +797,7 @@ function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots:
   };
 
   const isEmpty = months.length === 0 && snapshots.length === 0;
+  const hidden = isMoneyMasked();
 
 
   return (
