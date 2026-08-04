@@ -99,20 +99,11 @@ const SERIES_COLOR: Record<string, string> = {
 
 // --- Page ----------------------------------------------------------------
 function FinancesPage() {
-  return (
-    <PrivacyGuard
-      sensitivity="private-only"
-      fallback={
-        <GlassCard className="text-center">
-          <h1 className="text-2xl font-semibold">Finances hidden</h1>
-          <p className="mt-2 text-muted-foreground">Switch Privacy Mode to Private to view.</p>
-        </GlassCard>
-      }
-    >
-      <FinancesDashboard />
-    </PrivacyGuard>
-  );
+  // Guest mode keeps the full layout; numbers are masked and charts hidden.
+  const { mode } = usePrivacyMode();
+  return <FinancesDashboard key={mode} />;
 }
+
 
 function FinancesDashboard() {
   const accounts = useAccounts();
