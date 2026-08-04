@@ -55,8 +55,11 @@ function pickStatus() {
   return STATUS_MESSAGES[Math.floor(Math.random() * STATUS_MESSAGES.length)];
 }
 
-const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const fmtCents = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+// Guest privacy mode masks money values while keeping every tile in place.
+const fmt = (n: number) =>
+  maskMoney(n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }));
+const fmtCents = (n: number) =>
+  maskMoney(n.toLocaleString("en-US", { style: "currency", currency: "USD" }));
 
 function weatherIcon(code: number, cls = "size-8") {
   const c = weatherCondition(code).icon;
