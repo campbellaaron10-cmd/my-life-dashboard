@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { setMoneyMasked } from "@/lib/privacy-mask";
+
 
 export type PrivacyMode = "private" | "guest";
 
