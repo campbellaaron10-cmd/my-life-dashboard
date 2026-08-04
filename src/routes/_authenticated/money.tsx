@@ -67,7 +67,9 @@ const CATEGORY_LABELS: Record<string, { long: string; short: string }> = {
 };
 
 // Finance module always shows cents (the dashboard rounds to whole dollars).
-const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Guest privacy mode masks the value while keeping the layout intact.
+const fmt = (n: number) =>
+  maskMoney(n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const fmt2 = fmt;
 const monthKey = monthKeyOf;
 const monthLabel = monthLabelOf;
