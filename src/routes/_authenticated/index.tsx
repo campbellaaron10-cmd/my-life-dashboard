@@ -294,7 +294,13 @@ function Dashboard() {
                 </p>
                 <span className="text-[10px] text-primary">Open full chart →</span>
               </div>
-              <FinanceMiniChart months={finance.months.slice(-6)} compact />
+              {mode === "private" ? (
+                <FinanceMiniChart months={finance.months.slice(-6)} compact />
+              ) : (
+                <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
+                  Chart hidden in Guest mode.
+                </div>
+              )}
             </Link>
           </GlassCard>
         </PrivacyGuard>
