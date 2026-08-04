@@ -7,6 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { setMoneyMasked } from "@/lib/privacy-mask";
+
 
 export type PrivacyMode = "private" | "guest";
 
@@ -53,6 +55,10 @@ export function PrivacyModeProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, []);
+
+  // Keep the money-mask flag in sync during render, before children read it.
+  setMoneyMasked(mode !== "private");
+
 
   const canShow = useCallback(
     (s: Sensitivity) => {

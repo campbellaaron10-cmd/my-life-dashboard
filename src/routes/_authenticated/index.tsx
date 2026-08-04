@@ -13,7 +13,8 @@ import {
 } from "@/lib/atlas-data";
 import { useFinanceSummary, SERIES_COLOR, CATEGORY_LABELS } from "@/lib/finance-summary";
 import { useSavedLocation, useWeather, weatherCondition, useSavedTimeZone } from "@/hooks/useWeather";
-import { PrivacyGuard, usePrivacyMode } from "@/context/PrivacyMode";
+import { usePrivacyMode } from "@/context/PrivacyMode";
+import { maskMoney } from "@/lib/privacy-mask";
 import { SourceBadge } from "@/lib/task-sources";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -55,8 +56,11 @@ function pickStatus() {
   return STATUS_MESSAGES[Math.floor(Math.random() * STATUS_MESSAGES.length)];
 }
 
-const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-const fmtCents = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+// Guest privacy mode masks money values while keeping every tile in place.
+const fmt = (n: number) =>
+  maskMoney(n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }));
+const fmtCents = (n: number) =>
+  maskMoney(n.toLocaleString("en-US", { style: "currency", currency: "USD" }));
 
 function weatherIcon(code: number, cls = "size-8") {
   const c = weatherCondition(code).icon;
@@ -229,17 +233,8 @@ function Dashboard() {
 
       <div className="grid grid-cols-12 gap-6">
         {/* Financial Core — summary only, mirrors Finances module */}
-        <PrivacyGuard
-          sensitivity="private-only"
-          fallback={
-            <GlassCard className="col-span-12 lg:col-span-8">
-              <div className="flex flex-col items-center gap-3 py-10 text-center text-muted-foreground">
-                <Wallet className="size-8 opacity-40" />
-                <p>Finance hidden in Guest mode.</p>
-              </div>
-            </GlassCard>
-          }
-        >
+        <>
+
           <GlassCard className="col-span-12 lg:col-span-8">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
@@ -291,10 +286,16 @@ function Dashboard() {
                 </p>
                 <span className="text-[10px] text-primary">Open full chart →</span>
               </div>
-              <FinanceMiniChart months={finance.months.slice(-6)} compact />
+              {mode === "private" ? (
+                <FinanceMiniChart months={finance.months.slice(-6)} compact />
+              ) : (
+                <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
+                  Chart hidden in Guest mode.
+                </div>
+              )}
             </Link>
           </GlassCard>
-        </PrivacyGuard>
+        </>
 
         {/* Tasks — promoted next to Financial Core; will grow as Tasks matures. */}
         <GlassCard className="col-span-12 md:col-span-6 lg:col-span-4">

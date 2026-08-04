@@ -28,7 +28,8 @@ import {
   DEFAULT_RULES, type FinanceRules,
   type Account, type Transaction, type BudgetCategory, type BalanceSnapshot, type MonthlySummary,
 } from "@/lib/atlas-data";
-import { PrivacyGuard } from "@/context/PrivacyMode";
+import { usePrivacyMode } from "@/context/PrivacyMode";
+import { maskMoney, isMoneyMasked } from "@/lib/privacy-mask";
 import { useFinanceSummary, resolveRules } from "@/lib/finance-summary";
 import { monthKeyOf, monthLabel as monthLabelOf, parseLocalDate, type MonthDerived } from "@/lib/finance-engine";
 
@@ -67,7 +68,9 @@ const CATEGORY_LABELS: Record<string, { long: string; short: string }> = {
 };
 
 // Finance module always shows cents (the dashboard rounds to whole dollars).
-const fmt = (n: number) => n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Guest privacy mode masks the value while keeping the layout intact.
+const fmt = (n: number) =>
+  maskMoney(n.toLocaleString("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 const fmt2 = fmt;
 const monthKey = monthKeyOf;
 const monthLabel = monthLabelOf;
@@ -96,20 +99,11 @@ const SERIES_COLOR: Record<string, string> = {
 
 // --- Page ----------------------------------------------------------------
 function FinancesPage() {
-  return (
-    <PrivacyGuard
-      sensitivity="private-only"
-      fallback={
-        <GlassCard className="text-center">
-          <h1 className="text-2xl font-semibold">Finances hidden</h1>
-          <p className="mt-2 text-muted-foreground">Switch Privacy Mode to Private to view.</p>
-        </GlassCard>
-      }
-    >
-      <FinancesDashboard />
-    </PrivacyGuard>
-  );
+  // Guest mode keeps the full layout; numbers are masked and charts hidden.
+  const { mode } = usePrivacyMode();
+  return <FinancesDashboard key={mode} />;
 }
+
 
 function FinancesDashboard() {
   const accounts = useAccounts();
@@ -803,6 +797,7 @@ function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots:
   };
 
   const isEmpty = months.length === 0 && snapshots.length === 0;
+  const hidden = isMoneyMasked();
 
 
   return (
@@ -831,7 +826,9 @@ function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots:
           </button>
         </div>
       </div>
-      {isEmpty ? (
+      {hidden ? (
+        <EmptyState text="Chart hidden in Guest mode." />
+      ) : isEmpty ? (
         <EmptyState text="Import your workbook or add a monthly row to plot the trend." />
       ) : (
         <div className="h-72 w-full">
