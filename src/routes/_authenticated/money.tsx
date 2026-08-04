@@ -825,7 +825,9 @@ function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots:
           </button>
         </div>
       </div>
-      {isEmpty ? (
+      {hidden ? (
+        <EmptyState text="Chart hidden in Guest mode." />
+      ) : isEmpty ? (
         <EmptyState text="Import your workbook or add a monthly row to plot the trend." />
       ) : (
         <div className="h-72 w-full">
