@@ -75,6 +75,7 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
   const foods = useFoods();
   const pantry = usePantry();
   const [dialog, setDialog] = useState<Partial<Recipe> | null>(null);
+  const [query, setQuery] = useState("");
 
   const recipeIds = useMemo(() => (recipes.data ?? []).map((r) => r.id), [recipes.data]);
   const allIngs = useAllRecipeIngredients(recipeIds);
@@ -107,24 +108,40 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
           if (d != null && d <= 7 && (expiringSoon == null || d < expiringSoon)) expiringSoon = d;
         }
       }
-      return { recipe: r, coverage: cov.coverage, ingCount: ings.length, expiringSoon };
+      return { recipe: r, coverage: cov.coverage, ingCount: ings.length, expiringSoon, ingredients: ings };
     });
   }, [recipes.data, allIngs.data, pantry.data, foodsById]);
 
+  const q = query.trim().toLowerCase();
+  const matchesSearch = useMemo(() => {
+    if (!q) return scored;
+    return scored.filter((s) => {
+      const r = s.recipe;
+      const inTitle = r.title.toLowerCase().includes(q);
+      const inDesc = (r.description ?? "").toLowerCase().includes(q);
+      const inTags = (r.tags ?? []).some((t) => (TAGS_BY_ID.get(t)?.label ?? t).toLowerCase().includes(q));
+      const inIngredients = s.ingredients.some((ing) => {
+        const food = ing.food_id ? foodsById.get(ing.food_id) : null;
+        return (food?.name ?? ing.name_override ?? "").toLowerCase().includes(q);
+      });
+      return inTitle || inDesc || inTags || inIngredients;
+    });
+  }, [scored, q, foodsById]);
+
   const expiringSoon = useMemo(
-    () => scored.filter((s) => s.expiringSoon != null).sort((a, b) => (a.expiringSoon! - b.expiringSoon!)).slice(0, 6),
-    [scored],
+    () => matchesSearch.filter((s) => s.expiringSoon != null).sort((a, b) => (a.expiringSoon! - b.expiringSoon!)).slice(0, 6),
+    [matchesSearch],
   );
   const highMatch = useMemo(
-    () => scored.filter((s) => s.ingCount > 0 && s.coverage >= 0.6).sort((a, b) => b.coverage - a.coverage).slice(0, 6),
-    [scored],
+    () => matchesSearch.filter((s) => s.ingCount > 0 && s.coverage >= 0.6).sort((a, b) => b.coverage - a.coverage).slice(0, 6),
+    [matchesSearch],
   );
 
   // Filtered feed when a tag is active
   const filtered = useMemo(() => {
     if (!activeTag) return [];
-    return scored.filter((s) => (s.recipe.tags ?? []).includes(activeTag));
-  }, [scored, activeTag]);
+    return matchesSearch.filter((s) => (s.recipe.tags ?? []).includes(activeTag));
+  }, [matchesSearch, activeTag]);
 
   return (
     <div className="space-y-8">
@@ -139,6 +156,25 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
           <Plus className="mr-1 size-4" /> Recipe
         </Button>
       </header>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search recipes, ingredients, tags…"
+          className="h-11 rounded-2xl border-white/10 bg-white/5 pl-10 pr-10 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-white/[0.07]"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
 
       {recipes.isLoading ? (
         <GlassCard><p className="text-sm text-muted-foreground">Loading…</p></GlassCard>
