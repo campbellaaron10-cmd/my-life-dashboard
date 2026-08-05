@@ -207,43 +207,53 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
           />
 
           {/* Tag grid */}
-          <section>
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Browse by category</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {TAGS.map((t) => {
-                const count = scored.filter((s) => (s.recipe.tags ?? []).includes(t.id)).length;
-                const Icon = t.icon;
-                return (
-                  <Link
-                    key={t.id}
-                    to="/recipes"
-                    search={{ tag: t.id }}
-                    className={cn(
-                      "glass-panel group relative overflow-hidden rounded-2xl p-5 transition-all hover:scale-[1.02]",
-                    )}
-                  >
-                    <div className={cn("absolute inset-0 bg-gradient-to-br opacity-70", t.accent)} />
-                    <div className="relative flex items-center justify-between">
-                      <div>
-                        <Icon className="mb-3 size-5 text-foreground/80" />
-                        <p className="font-medium">{t.label}</p>
-                        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                          {count} {count === 1 ? "recipe" : "recipes"}
-                        </p>
+          {!q && (
+            <section>
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Browse by category</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {TAGS.map((t) => {
+                  const count = scored.filter((s) => (s.recipe.tags ?? []).includes(t.id)).length;
+                  const Icon = t.icon;
+                  return (
+                    <Link
+                      key={t.id}
+                      to="/recipes"
+                      search={{ tag: t.id }}
+                      className={cn(
+                        "glass-panel group relative overflow-hidden rounded-2xl p-5 transition-all hover:scale-[1.02]",
+                      )}
+                    >
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-70", t.accent)} />
+                      <div className="relative flex items-center justify-between">
+                        <div>
+                          <Icon className="mb-3 size-5 text-foreground/80" />
+                          <p className="font-medium">{t.label}</p>
+                          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                            {count} {count === 1 ? "recipe" : "recipes"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Full list */}
           <section>
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">All recipes</p>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {scored.map((s) => <RecipeCard key={s.recipe.id} row={s} />)}
-            </div>
+            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              {q ? `Search results (${matchesSearch.length})` : "All recipes"}
+            </p>
+            {matchesSearch.length === 0 ? (
+              <GlassCard className="py-12">
+                <p className="text-center text-sm text-muted-foreground">No recipes match “{query}”.</p>
+              </GlassCard>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {matchesSearch.map((s) => <RecipeCard key={s.recipe.id} row={s} />)}
+              </div>
+            )}
           </section>
         </>
       )}
