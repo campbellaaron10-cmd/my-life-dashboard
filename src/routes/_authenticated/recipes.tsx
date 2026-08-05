@@ -275,7 +275,7 @@ function SuggestionRow({
   title, subtitle, icon: Icon, accent, rows, emptyLabel,
 }: {
   title: string; subtitle: string; icon: typeof Sparkles; accent: string;
-  rows: { recipe: Recipe; coverage: number; ingCount: number; expiringSoon: number | null }[];
+  rows: ScoredRecipe[];
   emptyLabel: string;
 }) {
   return (
