@@ -61,6 +61,14 @@ const TAGS: TagDef[] = [
 ];
 const TAGS_BY_ID = new Map(TAGS.map((t) => [t.id, t]));
 
+type ScoredRecipe = {
+  recipe: Recipe;
+  coverage: number;
+  ingCount: number;
+  expiringSoon: number | null;
+  ingredients: RecipeIngredient[];
+};
+
 function RecipesPage() {
   const { id, tag } = Route.useSearch();
   if (id) return <RecipeDetail id={id} />;
