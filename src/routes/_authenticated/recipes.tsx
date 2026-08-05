@@ -300,7 +300,7 @@ function SuggestionRow({
 
 function FilteredView({ tag, rows }: {
   tag: string;
-  rows: { recipe: Recipe; coverage: number; ingCount: number; expiringSoon: number | null }[];
+  rows: ScoredRecipe[];
 }) {
   const def = TAGS_BY_ID.get(tag);
   const Icon = def?.icon ?? ChefHat;
