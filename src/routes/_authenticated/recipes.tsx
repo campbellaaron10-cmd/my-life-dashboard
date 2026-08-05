@@ -329,7 +329,7 @@ function FilteredView({ tag, rows }: {
   );
 }
 
-function RecipeCard({ row }: { row: { recipe: Recipe; coverage: number; ingCount: number; expiringSoon: number | null } }) {
+function RecipeCard({ row }: { row: ScoredRecipe }) {
   const r = row.recipe;
   const covPct = Math.round(row.coverage * 100);
   return (
