@@ -61,6 +61,14 @@ const TAGS: TagDef[] = [
 ];
 const TAGS_BY_ID = new Map(TAGS.map((t) => [t.id, t]));
 
+type ScoredRecipe = {
+  recipe: Recipe;
+  coverage: number;
+  ingCount: number;
+  expiringSoon: number | null;
+  ingredients: RecipeIngredient[];
+};
+
 function RecipesPage() {
   const { id, tag } = Route.useSearch();
   if (id) return <RecipeDetail id={id} />;
@@ -75,6 +83,7 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
   const foods = useFoods();
   const pantry = usePantry();
   const [dialog, setDialog] = useState<Partial<Recipe> | null>(null);
+  const [query, setQuery] = useState("");
 
   const recipeIds = useMemo(() => (recipes.data ?? []).map((r) => r.id), [recipes.data]);
   const allIngs = useAllRecipeIngredients(recipeIds);
@@ -107,24 +116,40 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
           if (d != null && d <= 7 && (expiringSoon == null || d < expiringSoon)) expiringSoon = d;
         }
       }
-      return { recipe: r, coverage: cov.coverage, ingCount: ings.length, expiringSoon };
+      return { recipe: r, coverage: cov.coverage, ingCount: ings.length, expiringSoon, ingredients: ings };
     });
   }, [recipes.data, allIngs.data, pantry.data, foodsById]);
 
+  const q = query.trim().toLowerCase();
+  const matchesSearch = useMemo(() => {
+    if (!q) return scored;
+    return scored.filter((s) => {
+      const r = s.recipe;
+      const inTitle = r.title.toLowerCase().includes(q);
+      const inDesc = (r.description ?? "").toLowerCase().includes(q);
+      const inTags = (r.tags ?? []).some((t) => (TAGS_BY_ID.get(t)?.label ?? t).toLowerCase().includes(q));
+      const inIngredients = s.ingredients.some((ing) => {
+        const food = ing.food_id ? foodsById.get(ing.food_id) : null;
+        return (food?.name ?? ing.name_override ?? "").toLowerCase().includes(q);
+      });
+      return inTitle || inDesc || inTags || inIngredients;
+    });
+  }, [scored, q, foodsById]);
+
   const expiringSoon = useMemo(
-    () => scored.filter((s) => s.expiringSoon != null).sort((a, b) => (a.expiringSoon! - b.expiringSoon!)).slice(0, 6),
-    [scored],
+    () => matchesSearch.filter((s) => s.expiringSoon != null).sort((a, b) => (a.expiringSoon! - b.expiringSoon!)).slice(0, 6),
+    [matchesSearch],
   );
   const highMatch = useMemo(
-    () => scored.filter((s) => s.ingCount > 0 && s.coverage >= 0.6).sort((a, b) => b.coverage - a.coverage).slice(0, 6),
-    [scored],
+    () => matchesSearch.filter((s) => s.ingCount > 0 && s.coverage >= 0.6).sort((a, b) => b.coverage - a.coverage).slice(0, 6),
+    [matchesSearch],
   );
 
   // Filtered feed when a tag is active
   const filtered = useMemo(() => {
     if (!activeTag) return [];
-    return scored.filter((s) => (s.recipe.tags ?? []).includes(activeTag));
-  }, [scored, activeTag]);
+    return matchesSearch.filter((s) => (s.recipe.tags ?? []).includes(activeTag));
+  }, [matchesSearch, activeTag]);
 
   return (
     <div className="space-y-8">
@@ -139,6 +164,25 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
           <Plus className="mr-1 size-4" /> Recipe
         </Button>
       </header>
+
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search recipes, ingredients, tags…"
+          className="h-11 rounded-2xl border-white/10 bg-white/5 pl-10 pr-10 text-sm placeholder:text-muted-foreground/60 focus-visible:bg-white/[0.07]"
+        />
+        {query && (
+          <button
+            onClick={() => setQuery("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label="Clear search"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
 
       {recipes.isLoading ? (
         <GlassCard><p className="text-sm text-muted-foreground">Loading…</p></GlassCard>
@@ -171,43 +215,53 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
           />
 
           {/* Tag grid */}
-          <section>
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Browse by category</p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              {TAGS.map((t) => {
-                const count = scored.filter((s) => (s.recipe.tags ?? []).includes(t.id)).length;
-                const Icon = t.icon;
-                return (
-                  <Link
-                    key={t.id}
-                    to="/recipes"
-                    search={{ tag: t.id }}
-                    className={cn(
-                      "glass-panel group relative overflow-hidden rounded-2xl p-5 transition-all hover:scale-[1.02]",
-                    )}
-                  >
-                    <div className={cn("absolute inset-0 bg-gradient-to-br opacity-70", t.accent)} />
-                    <div className="relative flex items-center justify-between">
-                      <div>
-                        <Icon className="mb-3 size-5 text-foreground/80" />
-                        <p className="font-medium">{t.label}</p>
-                        <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                          {count} {count === 1 ? "recipe" : "recipes"}
-                        </p>
+          {!q && (
+            <section>
+              <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Browse by category</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {TAGS.map((t) => {
+                  const count = scored.filter((s) => (s.recipe.tags ?? []).includes(t.id)).length;
+                  const Icon = t.icon;
+                  return (
+                    <Link
+                      key={t.id}
+                      to="/recipes"
+                      search={{ tag: t.id }}
+                      className={cn(
+                        "glass-panel group relative overflow-hidden rounded-2xl p-5 transition-all hover:scale-[1.02]",
+                      )}
+                    >
+                      <div className={cn("absolute inset-0 bg-gradient-to-br opacity-70", t.accent)} />
+                      <div className="relative flex items-center justify-between">
+                        <div>
+                          <Icon className="mb-3 size-5 text-foreground/80" />
+                          <p className="font-medium">{t.label}</p>
+                          <p className="mt-0.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                            {count} {count === 1 ? "recipe" : "recipes"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </section>
+                    </Link>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
           {/* Full list */}
           <section>
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">All recipes</p>
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {scored.map((s) => <RecipeCard key={s.recipe.id} row={s} />)}
-            </div>
+            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              {q ? `Search results (${matchesSearch.length})` : "All recipes"}
+            </p>
+            {matchesSearch.length === 0 ? (
+              <GlassCard className="py-12">
+                <p className="text-center text-sm text-muted-foreground">No recipes match “{query}”.</p>
+              </GlassCard>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {matchesSearch.map((s) => <RecipeCard key={s.recipe.id} row={s} />)}
+              </div>
+            )}
           </section>
         </>
       )}
@@ -221,7 +275,7 @@ function SuggestionRow({
   title, subtitle, icon: Icon, accent, rows, emptyLabel,
 }: {
   title: string; subtitle: string; icon: typeof Sparkles; accent: string;
-  rows: { recipe: Recipe; coverage: number; ingCount: number; expiringSoon: number | null }[];
+  rows: ScoredRecipe[];
   emptyLabel: string;
 }) {
   return (
@@ -246,7 +300,7 @@ function SuggestionRow({
 
 function FilteredView({ tag, rows }: {
   tag: string;
-  rows: { recipe: Recipe; coverage: number; ingCount: number; expiringSoon: number | null }[];
+  rows: ScoredRecipe[];
 }) {
   const def = TAGS_BY_ID.get(tag);
   const Icon = def?.icon ?? ChefHat;
@@ -275,7 +329,7 @@ function FilteredView({ tag, rows }: {
   );
 }
 
-function RecipeCard({ row }: { row: { recipe: Recipe; coverage: number; ingCount: number; expiringSoon: number | null } }) {
+function RecipeCard({ row }: { row: ScoredRecipe }) {
   const r = row.recipe;
   const covPct = Math.round(row.coverage * 100);
   return (
