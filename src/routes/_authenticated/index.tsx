@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { FinanceMiniChart } from "@/components/atlas/FinanceMiniChart";
+import { SpendRing } from "@/components/atlas/SpendRing";
 import {
   usePantry, useTasks, daysUntil,
   usePersonalDates, personalDateOccurrenceIn,
