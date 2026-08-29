@@ -172,6 +172,10 @@ export function useFinanceSummary(): FinanceSummary {
       months: result.months,
       balanceByCode,
       spentByCode: cur?.spent ?? { HOU: 0, ESS: 0, FUN: 0 },
+      outflowByCode,
+      outflowTotal,
+      priorIncome,
+      netGainLoss: priorIncome - outflowTotal,
       contribByCode: cur?.contrib ?? { STS: 0, LTS: 0, FED: 0, RSU: 0 },
       allocByCode: {
         HOU: cur?.spent.HOU ?? 0,
