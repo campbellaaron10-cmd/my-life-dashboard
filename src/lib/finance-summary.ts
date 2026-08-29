@@ -71,6 +71,13 @@ export type FinanceSummary = {
   months: MonthDerived[];
   balanceByCode: Record<string, number>;
   spentByCode: Record<string, number>;
+  /** Every dollar that left the budget this month, per category code. */
+  outflowByCode: Record<string, number>;
+  outflowTotal: number;
+  /** Income recorded in the prior month (the basis of this month's budget). */
+  priorIncome: number;
+  /** priorIncome − outflowTotal. Positive = gained, negative = lost. */
+  netGainLoss: number;
   contribByCode: Record<string, number>;
   allocByCode: Record<string, number>;
   rules: FinanceRules;
