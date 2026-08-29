@@ -327,7 +327,13 @@ function FinancesDashboard() {
       </GlassCard>
 
       {/* Growth chart with mode selector */}
-      <GrowthChart months={months} snapshots={snapshots.data ?? []} />
+      <GrowthChart
+        months={months}
+        snapshots={snapshots.data ?? []}
+        outflowByCode={finance.outflowByCode}
+        priorIncome={finance.priorIncome}
+        netGainLoss={finance.netGainLoss}
+      />
 
       {/* Recent activity — last 120 days by default, custom range optional */}
       <GlassCard>
