@@ -880,6 +880,13 @@ function GrowthChart({
           </ResponsiveContainer>
         </div>
       )}
+        <SpendRing
+          outflowByCode={outflowByCode}
+          basis={priorIncome}
+          netGainLoss={netGainLoss}
+          cents
+        />
+      </div>
     </GlassCard>
   );
 }
