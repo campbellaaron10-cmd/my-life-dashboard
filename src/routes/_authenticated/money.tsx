@@ -840,6 +840,7 @@ function GrowthChart({
           </button>
         </div>
       </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       {hidden ? (
         <EmptyState text="Chart hidden in Guest mode." />
       ) : isEmpty ? (
