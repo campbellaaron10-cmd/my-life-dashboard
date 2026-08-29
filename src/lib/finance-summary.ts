@@ -71,6 +71,13 @@ export type FinanceSummary = {
   months: MonthDerived[];
   balanceByCode: Record<string, number>;
   spentByCode: Record<string, number>;
+  /** Every dollar that left the budget this month, per category code. */
+  outflowByCode: Record<string, number>;
+  outflowTotal: number;
+  /** Income recorded in the prior month (the basis of this month's budget). */
+  priorIncome: number;
+  /** priorIncome − outflowTotal. Positive = gained, negative = lost. */
+  netGainLoss: number;
   contribByCode: Record<string, number>;
   allocByCode: Record<string, number>;
   rules: FinanceRules;
@@ -132,6 +139,22 @@ export function useFinanceSummary(): FinanceSummary {
     const monthlySpent = cur ? cur.spent.HOU + cur.spent.ESS + cur.spent.FUN : 0;
     const nextMonthIncome = cur?.income ?? 0;
 
+    // Everything that left the budget this month, per code. Derived straight
+    // from transactions so a new/edited transaction updates it immediately.
+    const codeOf = new Map(allBudgets.map((b) => [b.id, b.code]));
+    const outflowByCode: Record<string, number> = { HOU: 0, ESS: 0, FUN: 0, VAC: 0, STS: 0, LTS: 0 };
+    for (const t of allTxns) {
+      if (t.occurred_on.slice(0, 7) !== curMonthKey.slice(0, 7)) continue;
+      const code = t.category_id ? codeOf.get(t.category_id) : undefined;
+      if (!code || !(code in outflowByCode)) continue;
+      if (t.type === "expense" || t.type === "savings_contribution" || t.type === "investment_contribution") {
+        outflowByCode[code] += Math.abs(Number(t.amount));
+      }
+    }
+    const outflowTotal = Object.values(outflowByCode).reduce((s, v) => s + v, 0);
+    const priorIncome = result.previous?.income ?? 0;
+
+
     return {
       loading: accounts.isLoading || txns.isLoading || summaries.isLoading || budgets.isLoading,
       netWorth: accountsTotal + fallback,
@@ -149,6 +172,10 @@ export function useFinanceSummary(): FinanceSummary {
       months: result.months,
       balanceByCode,
       spentByCode: cur?.spent ?? { HOU: 0, ESS: 0, FUN: 0 },
+      outflowByCode,
+      outflowTotal,
+      priorIncome,
+      netGainLoss: priorIncome - outflowTotal,
       contribByCode: cur?.contrib ?? { STS: 0, LTS: 0, FED: 0, RSU: 0 },
       allocByCode: {
         HOU: cur?.spent.HOU ?? 0,

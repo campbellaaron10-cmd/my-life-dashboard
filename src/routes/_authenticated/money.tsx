@@ -31,6 +31,7 @@ import {
 import { usePrivacyMode } from "@/context/PrivacyMode";
 import { maskMoney, isMoneyMasked } from "@/lib/privacy-mask";
 import { useFinanceSummary, resolveRules } from "@/lib/finance-summary";
+import { SpendRing } from "@/components/atlas/SpendRing";
 import { monthKeyOf, monthLabel as monthLabelOf, parseLocalDate, type MonthDerived } from "@/lib/finance-engine";
 
 
@@ -327,7 +328,13 @@ function FinancesDashboard() {
       </GlassCard>
 
       {/* Growth chart with mode selector */}
-      <GrowthChart months={months} snapshots={snapshots.data ?? []} />
+      <GrowthChart
+        months={months}
+        snapshots={snapshots.data ?? []}
+        outflowByCode={finance.outflowByCode}
+        priorIncome={finance.priorIncome}
+        netGainLoss={finance.netGainLoss}
+      />
 
       {/* Recent activity — last 120 days by default, custom range optional */}
       <GlassCard>
@@ -757,7 +764,15 @@ function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction
 // --- Growth chart ---------------------------------------------------------
 type ChartMode = "balances" | "monthly";
 
-function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots: BalanceSnapshot[] }) {
+function GrowthChart({
+  months, snapshots, outflowByCode, priorIncome, netGainLoss,
+}: {
+  months: MonthDerived[];
+  snapshots: BalanceSnapshot[];
+  outflowByCode: Record<string, number>;
+  priorIncome: number;
+  netGainLoss: number;
+}) {
   const [mode, setMode] = useState<ChartMode>("balances");
 
   // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions,
@@ -826,6 +841,7 @@ function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots:
           </button>
         </div>
       </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       {hidden ? (
         <EmptyState text="Chart hidden in Guest mode." />
       ) : isEmpty ? (
@@ -865,6 +881,13 @@ function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots:
           </ResponsiveContainer>
         </div>
       )}
+        <SpendRing
+          outflowByCode={outflowByCode}
+          basis={priorIncome}
+          netGainLoss={netGainLoss}
+          cents
+        />
+      </div>
     </GlassCard>
   );
 }

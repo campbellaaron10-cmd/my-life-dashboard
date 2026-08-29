@@ -226,7 +226,7 @@ function RecipeList({ activeTag }: { activeTag?: string }) {
                     <Link
                       key={t.id}
                       to="/recipes"
-                      search={{ tag: t.id }}
+                      search={{ tag: t.id, id: undefined }}
                       className={cn(
                         "glass-panel group relative overflow-hidden rounded-2xl p-5 transition-all hover:scale-[1.02]",
                       )}
@@ -307,7 +307,7 @@ function FilteredView({ tag, rows }: {
   return (
     <section>
       <div className="mb-4 flex items-center gap-3">
-        <Link to="/recipes" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+        <Link to="/recipes" search={{ id: undefined, tag: undefined }} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
           <ArrowLeft className="size-3" /> All categories
         </Link>
       </div>
@@ -335,7 +335,7 @@ function RecipeCard({ row }: { row: ScoredRecipe }) {
   return (
     <Link
       to="/recipes"
-      search={{ id: r.id }}
+      search={{ id: r.id, tag: undefined }}
       className="glass-panel group relative overflow-hidden rounded-2xl p-4 transition-all hover:scale-[1.01]"
     >
       <div className="flex items-start justify-between gap-3">
@@ -453,7 +453,7 @@ function RecipeDetail({ id }: { id: string }) {
     <div className="space-y-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <Link to="/recipes" className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <Link to="/recipes" search={{ id: undefined, tag: undefined }} className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <ArrowLeft className="size-3" /> All recipes
           </Link>
           <h1 className="text-4xl font-bold tracking-tight">{r.title}</h1>

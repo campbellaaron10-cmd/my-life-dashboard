@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "@/components/atlas/GlassCard";
 import { FinanceMiniChart } from "@/components/atlas/FinanceMiniChart";
+import { SpendRing } from "@/components/atlas/SpendRing";
 import {
   usePantry, useTasks, daysUntil,
   usePersonalDates, personalDateOccurrenceIn,
@@ -247,53 +248,65 @@ function Dashboard() {
               </div>
             </div>
 
-            {/* Primary: budget & remaining */}
-            <div className="grid grid-cols-2 gap-3">
-              <MetricTile
-                label="Current Budget"
-                value={finance.budgetIsSet ? fmt(finance.monthlyBudget) : "—"}
-                hint={finance.budgetIsSet ? `Based on ${finance.priorMonthLabel} income` : "Close prior month"}
-              />
-              <MetricTile
-                label="Remaining"
-                value={finance.budgetIsSet ? fmt(finance.remainingBudget) : "—"}
-                hint={finance.budgetIsSet ? `${fmt(finance.monthlySpent)} spent` : ""}
-                accent={finance.remainingBudget < 0 ? "var(--warning, #f59e0b)" : undefined}
-              />
-            </div>
-
-            {/* Secondary: compact balance chips. RSU lives in the Finances module. */}
-            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <BalanceChip
-                label="Fun Remaining"
-                sub="FUN"
-                value={fmt(Math.max(0, (finance.allocByCode.FUN ?? 0) - (finance.spentByCode.FUN ?? 0)))}
-                color={SERIES_COLOR.FUN}
-              />
-              <BalanceChip label="Vacation" sub="VAC" value={fmt(finance.balanceByCode.VAC)} color={SERIES_COLOR.VAC} />
-              <BalanceChip label="Short-Term" sub="STS" value={fmt(finance.balanceByCode.STS)} color={SERIES_COLOR.STS} />
-              <BalanceChip label="Fidelity" sub="FED" value={fmt(finance.balanceByCode.FED)} color={SERIES_COLOR.FED} />
-              <BalanceChip label="Long-Term" sub="LTS" value={fmt(finance.balanceByCode.LTS)} color={SERIES_COLOR.LTS} />
-              <BalanceChip label="Regions" sub="CHK" value={fmt(finance.balanceByCode.Regions)} color={SERIES_COLOR.Regions} />
-            </div>
-
-            {/* Compact embedded chart — last 6 months only (trend preview). */}
-            <Link to="/money" className="mt-4 block rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10">
-              <div className="mb-1 flex items-center justify-between">
-                <p className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
-                  <LineChartIcon className="size-3" /> Investment & Savings Growth
-                  <span className="ml-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">6mo</span>
-                </p>
-                <span className="text-[10px] text-primary">Open full chart →</span>
-              </div>
-              {mode === "private" ? (
-                <FinanceMiniChart months={finance.months.slice(-6)} compact />
-              ) : (
-                <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
-                  Chart hidden in Guest mode.
+            {/* Split down the middle: condensed metrics left, spend ring right. */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div>
+                {/* Primary: budget & remaining */}
+                <div className="grid grid-cols-2 gap-3">
+                  <MetricTile
+                    label="Current Budget"
+                    value={finance.budgetIsSet ? fmt(finance.monthlyBudget) : "—"}
+                    hint={finance.budgetIsSet ? `Based on ${finance.priorMonthLabel} income` : "Close prior month"}
+                  />
+                  <MetricTile
+                    label="Remaining"
+                    value={finance.budgetIsSet ? fmt(finance.remainingBudget) : "—"}
+                    hint={finance.budgetIsSet ? `${fmt(finance.monthlySpent)} spent` : ""}
+                    accent={finance.remainingBudget < 0 ? "var(--warning, #f59e0b)" : undefined}
+                  />
                 </div>
-              )}
-            </Link>
+
+                {/* Secondary: abbreviation-only balance chips. */}
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <BalanceChip
+                    sub="FUN"
+                    value={fmt(Math.max(0, (finance.allocByCode.FUN ?? 0) - (finance.spentByCode.FUN ?? 0)))}
+                    color={SERIES_COLOR.FUN}
+                  />
+                  <BalanceChip sub="VAC" value={fmt(finance.balanceByCode.VAC)} color={SERIES_COLOR.VAC} />
+                  <BalanceChip sub="STS" value={fmt(finance.balanceByCode.STS)} color={SERIES_COLOR.STS} />
+                  <BalanceChip sub="FED" value={fmt(finance.balanceByCode.FED)} color={SERIES_COLOR.FED} />
+                  <BalanceChip sub="LTS" value={fmt(finance.balanceByCode.LTS)} color={SERIES_COLOR.LTS} />
+                  <BalanceChip sub="CHK" value={fmt(finance.balanceByCode.Regions)} color={SERIES_COLOR.Regions} />
+                </div>
+
+                {/* Compact embedded chart — last 6 months only (trend preview). */}
+                <Link to="/money" className="mt-3 block rounded-xl border border-white/5 bg-white/5 px-3 py-2 transition-colors hover:bg-white/10">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium text-muted-foreground">
+                      <LineChartIcon className="size-3 shrink-0" /> Investment &amp; Savings Growth
+                      <span className="ml-1 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">6mo</span>
+                    </p>
+                    <span className="shrink-0 text-[10px] text-primary">Open →</span>
+                  </div>
+                  {mode === "private" ? (
+                    <FinanceMiniChart months={finance.months.slice(-6)} compact />
+                  ) : (
+                    <div className="flex h-24 items-center justify-center text-xs text-muted-foreground">
+                      Chart hidden in Guest mode.
+                    </div>
+                  )}
+                </Link>
+              </div>
+
+              {/* Right half: net gain/loss + budget spend ring. */}
+              <SpendRing
+                outflowByCode={finance.outflowByCode}
+                basis={finance.priorIncome}
+                netGainLoss={finance.netGainLoss}
+                compact
+              />
+            </div>
           </GlassCard>
         </>
 
@@ -451,17 +464,14 @@ function EmptyLink({ to, icon: Icon, text }: { to: string; icon?: typeof Wallet;
   );
 }
 
-function BalanceChip({ label, sub, value, color }: { label: string; sub: string; value: string; color: string }) {
+function BalanceChip({ sub, value, color }: { sub: string; value: string; color: string }) {
   return (
-    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/5 px-3 py-2">
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="size-1.5 rounded-full" style={{ background: color }} />
-          <p className="truncate text-[11px] text-muted-foreground">{label}</p>
-        </div>
-        <p className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">{sub}</p>
+    <div className="flex items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/5 px-2.5 py-2">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <span className="size-2 shrink-0 rounded-sm" style={{ background: color }} />
+        <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">{sub}</p>
       </div>
-      <p className="font-mono text-sm font-semibold tracking-tight">{value}</p>
+      <p className="truncate font-mono text-sm font-semibold tracking-tight">{value}</p>
     </div>
   );
 }
