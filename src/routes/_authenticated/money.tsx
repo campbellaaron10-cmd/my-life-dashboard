@@ -763,7 +763,15 @@ function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction
 // --- Growth chart ---------------------------------------------------------
 type ChartMode = "balances" | "monthly";
 
-function GrowthChart({ months, snapshots }: { months: MonthDerived[]; snapshots: BalanceSnapshot[] }) {
+function GrowthChart({
+  months, snapshots, outflowByCode, priorIncome, netGainLoss,
+}: {
+  months: MonthDerived[];
+  snapshots: BalanceSnapshot[];
+  outflowByCode: Record<string, number>;
+  priorIncome: number;
+  netGainLoss: number;
+}) {
   const [mode, setMode] = useState<ChartMode>("balances");
 
   // BALANCES: cumulative Fidelity / LTS / RSU / Vacation / Short-Term Savings / Regions,
