@@ -209,6 +209,10 @@ export function computeFinance(input: EngineInput): EngineResult {
     const housing = isHistorical ? Number(s?.housing ?? 0) : (b?.spent.HOU ?? 0);
     const essSpent = isHistorical ? Number(s?.ess_spent ?? 0) : (b?.spent.ESS ?? 0);
     const funSpent = isHistorical ? Number(s?.fun_spent ?? 0) : (b?.spent.FUN ?? 0);
+    // Savings funds are spendable too: expenses booked to VAC/STS draw the fund
+    // down (and the paying account's ledger already reflects the same outflow).
+    const vacSpent = b?.spent.VAC ?? 0;
+    const stsSpent = b?.spent.STS ?? 0;
 
     // Budget: explicit override > derived from prior month > stored history.
     const override = overrides[month];
