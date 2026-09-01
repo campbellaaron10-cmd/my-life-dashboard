@@ -268,11 +268,12 @@ export function computeFinance(input: EngineInput): EngineResult {
 
       const stored = summaryBalance(s, code);
       const snap = snapshotBalance(month, SNAPSHOT_PATTERNS[code]);
-      if (stored) { balances[code] = stored; continue; }
-      if (snap != null && !isHistorical) { balances[code] = snap; continue; }
+      const drawdown = code === "VAC" ? vacSpent : code === "STS" ? stsSpent : 0;
+      if (stored) { balances[code] = stored - drawdown; continue; }
+      if (snap != null && !isHistorical) { balances[code] = snap - drawdown; continue; }
       const base = prev ? prev.balances[code] : 0;
-      if (code === "VAC") balances[code] = base + leftoverToVac;
-      else if (code === "STS") balances[code] = base + contrib.STS + leftoverToSts;
+      if (code === "VAC") balances[code] = base + leftoverToVac - vacSpent;
+      else if (code === "STS") balances[code] = base + contrib.STS + leftoverToSts - stsSpent;
       else if (code === "LTS") balances[code] = base + contrib.LTS;
       else if (code === "FED") balances[code] = base + contrib.FED;
       else if (code === "RSU") balances[code] = base + contrib.RSU;
@@ -285,7 +286,7 @@ export function computeFinance(input: EngineInput): EngineResult {
       month, isHistorical,
       income, housing, budget, budgetIsOverride,
       alloc,
-      spent: { HOU: housing, ESS: essSpent, FUN: funSpent },
+      spent: { HOU: housing, ESS: essSpent, FUN: funSpent, VAC: vacSpent, STS: stsSpent },
       contrib,
       spentTotal,
       remaining: budget - (essSpent + funSpent),
