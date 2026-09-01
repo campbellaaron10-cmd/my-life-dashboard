@@ -166,7 +166,7 @@ export function SpendRing({
       )}
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-        {RING_CODES.filter((c) => (outflowByCode[c] ?? 0) > 0).map((c) => (
+        {RING_CODES.filter((c) => (view.outflowByCode[c] ?? 0) > 0).map((c) => (
           <span key={c} className="flex items-center gap-1.5">
             <span className="size-2 rounded-sm" style={{ background: SERIES_COLOR[c] }} />
             {c}
