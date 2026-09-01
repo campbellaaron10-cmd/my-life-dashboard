@@ -252,7 +252,13 @@ export function computeFinance(input: EngineInput): EngineResult {
     // Balances: a non-zero stored summary value or a balance snapshot anchors the
     // series; otherwise carry the prior month forward and add this month's flows.
     const balances = zeroBalances();
+    regionsRunning += regionsDeltaByMonth.get(month) ?? 0;
     for (const code of BALANCE_CODES) {
+      if (code === "Regions" && regionsAcc) {
+        // Ledger-derived, so editing a transaction's date/amount moves the trend.
+        balances.Regions = regionsRunning;
+        continue;
+      }
       const stored = summaryBalance(s, code);
       const snap = snapshotBalance(month, SNAPSHOT_PATTERNS[code]);
       if (stored) { balances[code] = stored; continue; }
@@ -265,6 +271,7 @@ export function computeFinance(input: EngineInput): EngineResult {
       else if (code === "RSU") balances[code] = base + contrib.RSU;
       else balances[code] = base;
     }
+
 
     const spentTotal = housing + essSpent + funSpent;
     const row: MonthDerived = {
