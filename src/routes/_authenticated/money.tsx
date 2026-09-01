@@ -780,13 +780,14 @@ function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction
 type ChartMode = "balances" | "monthly";
 
 function GrowthChart({
-  months, snapshots, outflowByCode, priorIncome, netGainLoss,
+  months, snapshots, outflowByCode, priorIncome, netGainLoss, ringMonths,
 }: {
   months: MonthDerived[];
   snapshots: BalanceSnapshot[];
   outflowByCode: Record<string, number>;
   priorIncome: number;
   netGainLoss: number;
+  ringMonths: RingMonth[];
 }) {
   const [mode, setMode] = useState<ChartMode>("balances");
 
