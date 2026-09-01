@@ -814,6 +814,18 @@ function GrowthChart({
   const isEmpty = months.length === 0 && snapshots.length === 0;
   const hidden = isMoneyMasked();
 
+  // Per-mode series visibility. Hidden series are not rendered at all, so the
+  // Y axis auto-domain "zooms in" on whatever is left visible.
+  const [offBalances, setOffBalances] = useState<Record<string, boolean>>({});
+  const [offMonthly, setOffMonthly] = useState<Record<string, boolean>>({});
+  const off = mode === "balances" ? offBalances : offMonthly;
+  const setOff = mode === "balances" ? setOffBalances : setOffMonthly;
+  const allKeys: string[] = mode === "balances" ? (balanceSeries as string[]) : monthlySeries;
+  const colorOf = (k: string) => (mode === "balances" ? SERIES_COLOR[k] : monthlyColors[k]);
+  const visibleKeys = allKeys.filter((k) => !off[k]);
+  const toggle = (k: string) => setOff((p) => ({ ...p, [k]: !p[k] }));
+
+
 
   return (
     <GlassCard>
