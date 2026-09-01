@@ -78,6 +78,9 @@ export type FinanceSummary = {
   priorIncome: number;
   /** priorIncome − outflowTotal. Positive = gained, negative = lost. */
   netGainLoss: number;
+  /** Per-month ring data (oldest → newest) so the ring can look back. */
+  ringMonths: RingMonth[];
+
   contribByCode: Record<string, number>;
   allocByCode: Record<string, number>;
   rules: FinanceRules;
