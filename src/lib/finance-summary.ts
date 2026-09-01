@@ -55,7 +55,17 @@ export const engineRules = (r: FinanceRules): FinanceRulesFull => ({
   fun_to_sts_pct: Number(r.fun_to_sts_pct),
 });
 
+/** One month of ring-chart data: outflow by category vs. the income basis. */
+export type RingMonth = {
+  key: string;              // YYYY-MM-01
+  label: string;            // e.g. "September 2026"
+  outflowByCode: Record<string, number>;
+  basis: number;            // prior month's income
+  netGainLoss: number;      // basis − total outflow
+};
+
 export type FinanceSummary = {
+
   loading: boolean;
   netWorth: number;
   monthlyBudget: number;
