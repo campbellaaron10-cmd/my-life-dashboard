@@ -107,8 +107,11 @@ export function SpendRing({
                   color: "#f8fafc",
                   fontSize: 12,
                 }}
+                itemStyle={{ color: "#f8fafc" }}
+                labelStyle={{ color: "#f8fafc" }}
                 formatter={(v: any, n: any) => [fmt(Number(v)), n]}
               />
+
             </PieChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
