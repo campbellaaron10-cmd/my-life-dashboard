@@ -171,7 +171,7 @@ export function useFinanceSummary(): FinanceSummary {
       previous: result.previous,
       months: result.months,
       balanceByCode,
-      spentByCode: cur?.spent ?? { HOU: 0, ESS: 0, FUN: 0 },
+      spentByCode: cur?.spent ?? { HOU: 0, ESS: 0, FUN: 0, VAC: 0, STS: 0 },
       outflowByCode,
       outflowTotal,
       priorIncome,
