@@ -853,15 +853,6 @@ function GrowthChart({
           </button>
         </div>
       </div>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-      {hidden ? (
-        <EmptyState text="Chart hidden in Guest mode." />
-      ) : isEmpty ? (
-        <EmptyState text="Import your workbook or add a monthly row to plot the trend." />
-      ) : (
-        <div className="h-72 w-full">
-          <ResponsiveContainer>
-      </div>
 
       {!hidden && !isEmpty && (
         <div className="mb-3 flex flex-wrap items-center gap-2">
