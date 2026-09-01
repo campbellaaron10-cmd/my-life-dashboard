@@ -117,8 +117,9 @@ export function SpendRing({
         </div>
       ) : slices.length === 0 ? (
         <div className={`mt-3 flex ${size} items-center justify-center text-xs text-muted-foreground`}>
-          No spending yet this month.
+          {isCurrent ? "No spending yet this month." : "No spending recorded this month."}
         </div>
+
       ) : (
         <div className={`relative mt-2 ${size} w-full`}>
           <ResponsiveContainer>
