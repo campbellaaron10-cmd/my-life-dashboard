@@ -30,7 +30,7 @@ import {
 } from "@/lib/atlas-data";
 import { usePrivacyMode } from "@/context/PrivacyMode";
 import { maskMoney, isMoneyMasked } from "@/lib/privacy-mask";
-import { useFinanceSummary, resolveRules } from "@/lib/finance-summary";
+import { useFinanceSummary, resolveRules, type RingMonth } from "@/lib/finance-summary";
 import { SpendRing } from "@/components/atlas/SpendRing";
 import { monthKeyOf, monthLabel as monthLabelOf, parseLocalDate, type MonthDerived } from "@/lib/finance-engine";
 
@@ -335,6 +335,8 @@ function FinancesDashboard() {
         outflowByCode={finance.outflowByCode}
         priorIncome={finance.priorIncome}
         netGainLoss={finance.netGainLoss}
+        ringMonths={finance.ringMonths}
+
       />
 
       {/* Recent activity — last 120 days by default, custom range optional */}
@@ -778,13 +780,14 @@ function TxnRow({ txn, account, category, isCredit, onEdit }: { txn: Transaction
 type ChartMode = "balances" | "monthly";
 
 function GrowthChart({
-  months, snapshots, outflowByCode, priorIncome, netGainLoss,
+  months, snapshots, outflowByCode, priorIncome, netGainLoss, ringMonths,
 }: {
   months: MonthDerived[];
   snapshots: BalanceSnapshot[];
   outflowByCode: Record<string, number>;
   priorIncome: number;
   netGainLoss: number;
+  ringMonths: RingMonth[];
 }) {
   const [mode, setMode] = useState<ChartMode>("balances");
 
@@ -947,6 +950,7 @@ function GrowthChart({
           outflowByCode={outflowByCode}
           basis={priorIncome}
           netGainLoss={netGainLoss}
+          months={ringMonths}
           cents
         />
       </div>

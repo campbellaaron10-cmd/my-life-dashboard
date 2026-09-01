@@ -1,9 +1,10 @@
 // Budget spend ring — a donut chart of this month's outflow by category,
 // with the net gained/lost figure above it. Fed directly from the live finance
 // summary, so a new or edited transaction re-renders it instantly.
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { SERIES_COLOR, CATEGORY_LABELS } from "@/lib/finance-summary";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { SERIES_COLOR, CATEGORY_LABELS, type RingMonth } from "@/lib/finance-summary";
 import { maskMoney, isMoneyMasked } from "@/lib/privacy-mask";
 
 export const RING_CODES = ["HOU", "ESS", "FUN", "VAC", "STS", "LTS"] as const;
@@ -14,6 +15,7 @@ export function SpendRing({
   outflowByCode,
   basis,
   netGainLoss,
+  months,
   cents = false,
   compact = false,
 }: {
@@ -21,9 +23,23 @@ export function SpendRing({
   /** Total money the ring is measured against (last month's income). */
   basis: number;
   netGainLoss: number;
+  /** Optional month history; enables the ← / → month switcher. */
+  months?: RingMonth[];
   cents?: boolean;
   compact?: boolean;
 }) {
+  const history = months ?? [];
+  const [idx, setIdx] = useState(Math.max(0, history.length - 1));
+  useEffect(() => {
+    setIdx(Math.max(0, history.length - 1));
+  }, [history.length]);
+
+  const active = history[idx];
+  const isCurrent = !active || idx === history.length - 1;
+  const view = active
+    ? { outflowByCode: active.outflowByCode, basis: active.basis, netGainLoss: active.netGainLoss }
+    : { outflowByCode, basis, netGainLoss };
+
   const fmt = (n: number) =>
     maskMoney(
       n.toLocaleString("en-US", {
@@ -38,35 +54,62 @@ export function SpendRing({
     const s = RING_CODES.map((code) => ({
       code,
       name: CATEGORY_LABELS[code]?.long ?? code,
-      value: Math.max(0, outflowByCode[code] ?? 0),
+      value: Math.max(0, view.outflowByCode[code] ?? 0),
     })).filter((d) => d.value > 0);
     const total = s.reduce((a, b) => a + b.value, 0);
-    const remaining = Math.max(0, basis - total);
+    const remaining = Math.max(0, view.basis - total);
     const data = remaining > 0 ? [...s, { code: "__rest", name: "Unspent", value: remaining }] : s;
-    return { slices: data, spent: total, pct: basis > 0 ? Math.min(999, (total / basis) * 100) : 0 };
-  }, [outflowByCode, basis]);
+    return { slices: data, spent: total, pct: view.basis > 0 ? Math.min(999, (total / view.basis) * 100) : 0 };
+  }, [view.outflowByCode, view.basis]);
 
   const masked = isMoneyMasked();
-  const gain = netGainLoss >= 0;
+  const gain = view.netGainLoss >= 0;
   const size = compact ? "h-[168px]" : "h-[220px]";
 
   return (
     <div className="flex h-full flex-col">
+      {history.length > 1 ? (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setIdx((i) => Math.max(0, i - 1))}
+            disabled={idx === 0}
+            aria-label="Previous month"
+            className="rounded-lg border border-white/10 bg-white/5 p-1 text-muted-foreground transition hover:bg-white/10 hover:text-foreground disabled:opacity-30"
+          >
+            <ChevronLeft className="size-3.5" />
+          </button>
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            {active?.label ?? "This month"}
+          </span>
+          <button
+            type="button"
+            onClick={() => setIdx((i) => Math.min(history.length - 1, i + 1))}
+            disabled={idx >= history.length - 1}
+            aria-label="Next month"
+            className="rounded-lg border border-white/10 bg-white/5 p-1 text-muted-foreground transition hover:bg-white/10 hover:text-foreground disabled:opacity-30"
+          >
+            <ChevronRight className="size-3.5" />
+          </button>
+        </div>
+      ) : null}
+
       <div className="rounded-xl border border-white/5 bg-white/5 px-3 py-2">
         <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {gain ? "Net gained" : "Net lost"}
+          {gain ? "Net gained" : "Net lost — spent more than earned"}
         </p>
         <p
           className="font-mono text-2xl font-bold"
           style={{ color: gain ? SERIES_COLOR.FED : "var(--warning, #f59e0b)" }}
         >
           {gain ? "" : "−"}
-          {fmt(Math.abs(netGainLoss))}
+          {fmt(Math.abs(view.netGainLoss))}
         </p>
         <p className="text-[11px] text-muted-foreground">
-          {fmt(basis)} income − {fmt(spent)} spent
+          {fmt(view.basis)} income − {fmt(spent)} spent
         </p>
       </div>
+
 
       {masked ? (
         <div className={`mt-3 flex ${size} items-center justify-center rounded-xl border border-white/5 text-xs text-muted-foreground`}>
@@ -74,8 +117,9 @@ export function SpendRing({
         </div>
       ) : slices.length === 0 ? (
         <div className={`mt-3 flex ${size} items-center justify-center text-xs text-muted-foreground`}>
-          No spending yet this month.
+          {isCurrent ? "No spending yet this month." : "No spending recorded this month."}
         </div>
+
       ) : (
         <div className={`relative mt-2 ${size} w-full`}>
           <ResponsiveContainer>
@@ -122,7 +166,7 @@ export function SpendRing({
       )}
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-        {RING_CODES.filter((c) => (outflowByCode[c] ?? 0) > 0).map((c) => (
+        {RING_CODES.filter((c) => (view.outflowByCode[c] ?? 0) > 0).map((c) => (
           <span key={c} className="flex items-center gap-1.5">
             <span className="size-2 rounded-sm" style={{ background: SERIES_COLOR[c] }} />
             {c}

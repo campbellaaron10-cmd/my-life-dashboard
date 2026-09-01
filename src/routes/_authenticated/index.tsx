@@ -304,6 +304,7 @@ function Dashboard() {
                 outflowByCode={finance.outflowByCode}
                 basis={finance.priorIncome}
                 netGainLoss={finance.netGainLoss}
+                months={finance.ringMonths}
                 compact
               />
             </div>

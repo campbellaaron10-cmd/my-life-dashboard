@@ -55,7 +55,17 @@ export const engineRules = (r: FinanceRules): FinanceRulesFull => ({
   fun_to_sts_pct: Number(r.fun_to_sts_pct),
 });
 
+/** One month of ring-chart data: outflow by category vs. the income basis. */
+export type RingMonth = {
+  key: string;              // YYYY-MM-01
+  label: string;            // e.g. "September 2026"
+  outflowByCode: Record<string, number>;
+  basis: number;            // prior month's income
+  netGainLoss: number;      // basis − total outflow
+};
+
 export type FinanceSummary = {
+
   loading: boolean;
   netWorth: number;
   monthlyBudget: number;
@@ -78,6 +88,9 @@ export type FinanceSummary = {
   priorIncome: number;
   /** priorIncome − outflowTotal. Positive = gained, negative = lost. */
   netGainLoss: number;
+  /** Per-month ring data (oldest → newest) so the ring can look back. */
+  ringMonths: RingMonth[];
+
   contribByCode: Record<string, number>;
   allocByCode: Record<string, number>;
   rules: FinanceRules;
@@ -154,6 +167,44 @@ export function useFinanceSummary(): FinanceSummary {
     const outflowTotal = Object.values(outflowByCode).reduce((s, v) => s + v, 0);
     const priorIncome = result.previous?.income ?? 0;
 
+    // Same math, month by month, so the ring can be scrolled back through
+    // history to see any month where spending outran income.
+    const RING_KEYS = ["HOU", "ESS", "FUN", "VAC", "STS", "LTS"] as const;
+    const outflowByMonth = new Map<string, Record<string, number>>();
+    for (const t of allTxns) {
+      const code = t.category_id ? codeOf.get(t.category_id) : undefined;
+      if (!code || !RING_KEYS.includes(code as any)) continue;
+      if (t.type !== "expense" && t.type !== "savings_contribution" && t.type !== "investment_contribution") continue;
+      const key = monthOfDate(t.occurred_on);
+      let row = outflowByMonth.get(key);
+      if (!row) {
+        row = Object.fromEntries(RING_KEYS.map((c) => [c, 0]));
+        outflowByMonth.set(key, row);
+      }
+      row[code] += Math.abs(Number(t.amount));
+    }
+    const incomeByMonth = new Map(result.months.map((m) => [m.month, m.income]));
+    const keys = Array.from(new Set([...outflowByMonth.keys(), ...incomeByMonth.keys(), curMonthKey]))
+      .filter((k) => k <= curMonthKey)
+      .sort()
+      .slice(-24);
+    const ringMonths: RingMonth[] = keys.map((key) => {
+      const row = outflowByMonth.get(key) ?? Object.fromEntries(RING_KEYS.map((c) => [c, 0]));
+      const [y, m] = key.split("-").map(Number);
+      const prevKey = monthKeyOf(new Date(y, m - 2, 1));
+      const basis = incomeByMonth.get(prevKey) ?? 0;
+      const total = Object.values(row).reduce((s, v) => s + v, 0);
+      return {
+        key,
+        label: new Date(y, m - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" }),
+        outflowByCode: row,
+        basis,
+        netGainLoss: basis - total,
+      };
+    });
+
+
+
 
     return {
       loading: accounts.isLoading || txns.isLoading || summaries.isLoading || budgets.isLoading,
@@ -176,6 +227,8 @@ export function useFinanceSummary(): FinanceSummary {
       outflowTotal,
       priorIncome,
       netGainLoss: priorIncome - outflowTotal,
+      ringMonths,
+
       contribByCode: cur?.contrib ?? { STS: 0, LTS: 0, FED: 0, RSU: 0 },
       allocByCode: {
         HOU: cur?.spent.HOU ?? 0,
