@@ -30,7 +30,7 @@ import {
 } from "@/lib/atlas-data";
 import { usePrivacyMode } from "@/context/PrivacyMode";
 import { maskMoney, isMoneyMasked } from "@/lib/privacy-mask";
-import { useFinanceSummary, resolveRules } from "@/lib/finance-summary";
+import { useFinanceSummary, resolveRules, type RingMonth } from "@/lib/finance-summary";
 import { SpendRing } from "@/components/atlas/SpendRing";
 import { monthKeyOf, monthLabel as monthLabelOf, parseLocalDate, type MonthDerived } from "@/lib/finance-engine";
 
