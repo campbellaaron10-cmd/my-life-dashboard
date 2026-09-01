@@ -162,6 +162,28 @@ export function computeFinance(input: EngineInput): EngineResult {
     FED: [/fidelity|brokerage/i], RSU: [/rsu|restricted|stock|equity/i], Regions: [/regions/i],
   };
 
+  // --- Regions checking is a real cash account, so its trend must follow the
+  // account ledger exactly (same math as the Regions Checking card): starting
+  // balance plus every income/expense booked to that account, month by month.
+  const regionsAcc =
+    accounts.find((a) => /regions/i.test(a.name)) ??
+    accounts.find((a) => a.type === "checking") ?? null;
+  const regionsDeltaByMonth = new Map<string, number>();
+  if (regionsAcc) {
+    for (const t of transactions) {
+      if (t.account_id !== regionsAcc.id) continue;
+      const amt = Number(t.amount);
+      let d = 0;
+      if (t.type === "income") d = amt;
+      else if (t.type === "expense") d = -amt;
+      else continue;
+      const m = monthOfDate(t.occurred_on);
+      regionsDeltaByMonth.set(m, (regionsDeltaByMonth.get(m) ?? 0) + d);
+    }
+  }
+  let regionsRunning = regionsAcc ? Number(regionsAcc.starting_balance) : 0;
+
+
   // --- month range
   const summaryMonths = summaries.map((s) => s.month);
   const txnMonths = [...buckets.keys()];
