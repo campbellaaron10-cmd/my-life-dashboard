@@ -335,6 +335,7 @@ function FinancesDashboard() {
         outflowByCode={finance.outflowByCode}
         priorIncome={finance.priorIncome}
         netGainLoss={finance.netGainLoss}
+          months={ringMonths}
       />
 
       {/* Recent activity — last 120 days by default, custom range optional */}
@@ -947,6 +948,7 @@ function GrowthChart({
           outflowByCode={outflowByCode}
           basis={priorIncome}
           netGainLoss={netGainLoss}
+          months={ringMonths}
           cents
         />
       </div>
