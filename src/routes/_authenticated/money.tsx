@@ -902,14 +902,14 @@ function GrowthChart({
 
                 <CartesianGrid stroke={CHART.grid} strokeDasharray="3 4" />
                 <XAxis dataKey="date" stroke={CHART.axis} tick={{ fill: CHART.axis, fontSize: 11 }} tickLine={false} />
-                <YAxis stroke={CHART.axis} tick={{ fill: CHART.axis, fontSize: 11 }} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <YAxis stroke={CHART.axis} tick={{ fill: CHART.axis, fontSize: 11 }} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} domain={["auto", "auto"]} />
                 <Tooltip
                   contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, borderRadius: 12, color: "#f8fafc" }}
                   formatter={(v: any, k: any) => [fmt(Number(v)), k]}
                 />
                 <Legend wrapperStyle={{ color: CHART.axis, fontSize: 12 }} />
-                {balanceSeries.map((k) => (
-                  <Line key={k} type="monotone" dataKey={k} stroke={SERIES_COLOR[k as string]} strokeWidth={2} dot={{ r: 3 }} />
+                {visibleKeys.map((k) => (
+                  <Line key={k} type="monotone" dataKey={k} stroke={SERIES_COLOR[k]} strokeWidth={2} dot={{ r: 3 }} />
                 ))}
               </LineChart>
             ) : (
@@ -922,7 +922,7 @@ function GrowthChart({
                   formatter={(v: any, k: any) => [fmt(Number(v)), k]}
                 />
                 <Legend wrapperStyle={{ color: CHART.axis, fontSize: 12 }} />
-                {monthlySeries.map((k) => (
+                {visibleKeys.map((k) => (
                   <Bar key={k} dataKey={k} fill={monthlyColors[k]} radius={[4, 4, 0, 0]} />
                 ))}
               </BarChart>
