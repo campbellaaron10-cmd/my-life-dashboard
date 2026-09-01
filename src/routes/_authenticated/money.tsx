@@ -709,7 +709,7 @@ function BudgetRow({
         <p className="mt-2 text-xs text-muted-foreground">
           No fixed allocation. Next month's budget = this month's income − housing.
         </p>
-      ) : isSpending ? (
+      ) : !isFund ? (
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
           <span>Monthly allocation {fmt(limit)}</span>
           <span className={limit - spent < 0 ? "text-warning" : ""}>Remaining {fmt(limit - spent)}</span>
