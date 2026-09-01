@@ -861,8 +861,54 @@ function GrowthChart({
       ) : (
         <div className="h-72 w-full">
           <ResponsiveContainer>
+      </div>
+
+      {!hidden && !isEmpty && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {allKeys.map((k) => {
+            const active = !off[k];
+            return (
+              <button
+                key={k}
+                onClick={() => toggle(k)}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider transition ${
+                  active
+                    ? "border-white/20 bg-white/10 text-foreground"
+                    : "border-white/10 bg-transparent text-muted-foreground line-through opacity-60"
+                }`}
+              >
+                <span
+                  className="size-2.5 rounded-sm"
+                  style={{ background: active ? colorOf(k) : "rgba(255,255,255,0.2)" }}
+                />
+                {k}
+              </button>
+            );
+          })}
+          {visibleKeys.length !== allKeys.length && (
+            <button
+              onClick={() => setOff({})}
+              className="rounded-full border border-white/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            >
+              Show all
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      {hidden ? (
+        <EmptyState text="Chart hidden in Guest mode." />
+      ) : isEmpty ? (
+        <EmptyState text="Import your workbook or add a monthly row to plot the trend." />
+      ) : visibleKeys.length === 0 ? (
+        <EmptyState text="All series hidden — turn one back on above." />
+      ) : (
+        <div className="h-72 w-full">
+          <ResponsiveContainer>
             {mode === "balances" ? (
               <LineChart data={balanceRows} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+
                 <CartesianGrid stroke={CHART.grid} strokeDasharray="3 4" />
                 <XAxis dataKey="date" stroke={CHART.axis} tick={{ fill: CHART.axis, fontSize: 11 }} tickLine={false} />
                 <YAxis stroke={CHART.axis} tick={{ fill: CHART.axis, fontSize: 11 }} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
