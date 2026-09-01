@@ -308,7 +308,8 @@ function FinancesDashboard() {
           <EmptyState text="No budget categories yet." />
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
-            {allBudgets.map((c) => (
+            {/* FED / LTS / RSU balances live in the top tiles + growth chart. */}
+            {allBudgets.filter((c) => !["FED", "LTS", "RSU"].includes(c.code)).map((c) => (
               <BudgetRow
                 key={c.id}
                 cat={c}
@@ -655,6 +656,11 @@ function BudgetRow({
   // Housing & Utilities has no fixed allocation — budget for next month is
   // derived from (income − housing). Show spend only, no bar/remaining/%.
   const isHousing = cat.code === "HOU";
+  // Savings funds (VAC / STS) read like spending categories: the money
+  // available this month is what's left in the fund plus what's been spent
+  // from it, and "remaining" is the fund's current balance.
+  const isFund = !isSpending && !isHousing;
+  const available = balance + spent;
 
   let barValue = 0;
   let barMax = 0;
@@ -666,12 +672,12 @@ function BudgetRow({
     barMax = limit;
     headline = `${fmt(spent)} / ${fmt(limit)}`;
   } else {
-    barValue = contribution;
-    barMax = limit > 0 ? limit : (goal ?? 0);
-    headline = `${fmt(contribution)} contributed`;
+    barValue = spent;
+    barMax = available;
+    headline = `${fmt(spent)} / ${fmt(available)}`;
   }
   const pct = barMax > 0 ? Math.min(100, (barValue / barMax) * 100) : 0;
-  const overspent = isSpending && !isHousing && limit > 0 && spent > limit;
+  const overspent = isHousing ? false : isSpending ? (limit > 0 && spent > limit) : balance < 0;
   const goalPct = goal && goal > 0 ? Math.min(100, (balance / goal) * 100) : null;
 
   return (
@@ -704,17 +710,24 @@ function BudgetRow({
         <p className="mt-2 text-xs text-muted-foreground">
           No fixed allocation. Next month's budget = this month's income − housing.
         </p>
-      ) : isSpending ? (
+      ) : !isFund ? (
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted-foreground">
           <span>Monthly allocation {fmt(limit)}</span>
           <span className={limit - spent < 0 ? "text-warning" : ""}>Remaining {fmt(limit - spent)}</span>
         </div>
       ) : (
         <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>Actual this month</span>
+          <span>Spent this month</span>
+          <span className="text-right font-mono">{fmt(spent)}</span>
+          <span>Added this month</span>
           <span className="text-right font-mono">{fmt(contribution)}</span>
-          <span>Current balance</span>
-          <span className="text-right font-mono" style={{ color: accent }}>{fmt(balance)}</span>
+          <span className={overspent ? "text-warning" : ""}>Remaining (balance)</span>
+          <span
+            className={`text-right font-mono ${overspent ? "text-warning" : ""}`}
+            style={overspent ? undefined : { color: accent }}
+          >
+            {fmt(balance)}
+          </span>
         </div>
       )}
 

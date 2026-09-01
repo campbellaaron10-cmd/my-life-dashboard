@@ -40,7 +40,7 @@ export type MonthDerived = {
   budget: number;
   budgetIsOverride: boolean;
   alloc: { ESS: number; FUN: number; STS: number };
-  spent: { HOU: number; ESS: number; FUN: number };
+  spent: { HOU: number; ESS: number; FUN: number; VAC: number; STS: number };
   contrib: { STS: number; LTS: number; FED: number; RSU: number };
   spentTotal: number;
   remaining: number;
@@ -209,6 +209,10 @@ export function computeFinance(input: EngineInput): EngineResult {
     const housing = isHistorical ? Number(s?.housing ?? 0) : (b?.spent.HOU ?? 0);
     const essSpent = isHistorical ? Number(s?.ess_spent ?? 0) : (b?.spent.ESS ?? 0);
     const funSpent = isHistorical ? Number(s?.fun_spent ?? 0) : (b?.spent.FUN ?? 0);
+    // Savings funds are spendable too: expenses booked to VAC/STS draw the fund
+    // down (and the paying account's ledger already reflects the same outflow).
+    const vacSpent = b?.spent.VAC ?? 0;
+    const stsSpent = b?.spent.STS ?? 0;
 
     // Budget: explicit override > derived from prior month > stored history.
     const override = overrides[month];
@@ -264,11 +268,12 @@ export function computeFinance(input: EngineInput): EngineResult {
 
       const stored = summaryBalance(s, code);
       const snap = snapshotBalance(month, SNAPSHOT_PATTERNS[code]);
-      if (stored) { balances[code] = stored; continue; }
-      if (snap != null && !isHistorical) { balances[code] = snap; continue; }
+      const drawdown = code === "VAC" ? vacSpent : code === "STS" ? stsSpent : 0;
+      if (stored) { balances[code] = stored - drawdown; continue; }
+      if (snap != null && !isHistorical) { balances[code] = snap - drawdown; continue; }
       const base = prev ? prev.balances[code] : 0;
-      if (code === "VAC") balances[code] = base + leftoverToVac;
-      else if (code === "STS") balances[code] = base + contrib.STS + leftoverToSts;
+      if (code === "VAC") balances[code] = base + leftoverToVac - vacSpent;
+      else if (code === "STS") balances[code] = base + contrib.STS + leftoverToSts - stsSpent;
       else if (code === "LTS") balances[code] = base + contrib.LTS;
       else if (code === "FED") balances[code] = base + contrib.FED;
       else if (code === "RSU") balances[code] = base + contrib.RSU;
@@ -281,7 +286,7 @@ export function computeFinance(input: EngineInput): EngineResult {
       month, isHistorical,
       income, housing, budget, budgetIsOverride,
       alloc,
-      spent: { HOU: housing, ESS: essSpent, FUN: funSpent },
+      spent: { HOU: housing, ESS: essSpent, FUN: funSpent, VAC: vacSpent, STS: stsSpent },
       contrib,
       spentTotal,
       remaining: budget - (essSpent + funSpent),
