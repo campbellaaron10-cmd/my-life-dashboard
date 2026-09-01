@@ -227,6 +227,8 @@ export function useFinanceSummary(): FinanceSummary {
       outflowTotal,
       priorIncome,
       netGainLoss: priorIncome - outflowTotal,
+      ringMonths,
+
       contribByCode: cur?.contrib ?? { STS: 0, LTS: 0, FED: 0, RSU: 0 },
       allocByCode: {
         HOU: cur?.spent.HOU ?? 0,
