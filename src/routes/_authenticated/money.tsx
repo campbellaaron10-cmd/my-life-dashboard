@@ -814,6 +814,18 @@ function GrowthChart({
   const isEmpty = months.length === 0 && snapshots.length === 0;
   const hidden = isMoneyMasked();
 
+  // Per-mode series visibility. Hidden series are not rendered at all, so the
+  // Y axis auto-domain "zooms in" on whatever is left visible.
+  const [offBalances, setOffBalances] = useState<Record<string, boolean>>({});
+  const [offMonthly, setOffMonthly] = useState<Record<string, boolean>>({});
+  const off = mode === "balances" ? offBalances : offMonthly;
+  const setOff = mode === "balances" ? setOffBalances : setOffMonthly;
+  const allKeys: string[] = mode === "balances" ? (balanceSeries as string[]) : monthlySeries;
+  const colorOf = (k: string) => (mode === "balances" ? SERIES_COLOR[k] : monthlyColors[k]);
+  const visibleKeys = allKeys.filter((k) => !off[k]);
+  const toggle = (k: string) => setOff((p) => ({ ...p, [k]: !p[k] }));
+
+
 
   return (
     <GlassCard>
@@ -841,26 +853,63 @@ function GrowthChart({
           </button>
         </div>
       </div>
+
+      {!hidden && !isEmpty && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {allKeys.map((k) => {
+            const active = !off[k];
+            return (
+              <button
+                key={k}
+                onClick={() => toggle(k)}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider transition ${
+                  active
+                    ? "border-white/20 bg-white/10 text-foreground"
+                    : "border-white/10 bg-transparent text-muted-foreground line-through opacity-60"
+                }`}
+              >
+                <span
+                  className="size-2.5 rounded-sm"
+                  style={{ background: active ? colorOf(k) : "rgba(255,255,255,0.2)" }}
+                />
+                {k}
+              </button>
+            );
+          })}
+          {visibleKeys.length !== allKeys.length && (
+            <button
+              onClick={() => setOff({})}
+              className="rounded-full border border-white/10 px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider text-muted-foreground hover:text-foreground"
+            >
+              Show all
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       {hidden ? (
         <EmptyState text="Chart hidden in Guest mode." />
       ) : isEmpty ? (
         <EmptyState text="Import your workbook or add a monthly row to plot the trend." />
+      ) : visibleKeys.length === 0 ? (
+        <EmptyState text="All series hidden — turn one back on above." />
       ) : (
         <div className="h-72 w-full">
           <ResponsiveContainer>
             {mode === "balances" ? (
               <LineChart data={balanceRows} margin={{ top: 8, right: 12, bottom: 4, left: 0 }}>
+
                 <CartesianGrid stroke={CHART.grid} strokeDasharray="3 4" />
                 <XAxis dataKey="date" stroke={CHART.axis} tick={{ fill: CHART.axis, fontSize: 11 }} tickLine={false} />
-                <YAxis stroke={CHART.axis} tick={{ fill: CHART.axis, fontSize: 11 }} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                <YAxis stroke={CHART.axis} tick={{ fill: CHART.axis, fontSize: 11 }} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} domain={["auto", "auto"]} />
                 <Tooltip
                   contentStyle={{ background: CHART.tooltipBg, border: `1px solid ${CHART.tooltipBorder}`, borderRadius: 12, color: "#f8fafc" }}
                   formatter={(v: any, k: any) => [fmt(Number(v)), k]}
                 />
                 <Legend wrapperStyle={{ color: CHART.axis, fontSize: 12 }} />
-                {balanceSeries.map((k) => (
-                  <Line key={k} type="monotone" dataKey={k} stroke={SERIES_COLOR[k as string]} strokeWidth={2} dot={{ r: 3 }} />
+                {visibleKeys.map((k) => (
+                  <Line key={k} type="monotone" dataKey={k} stroke={SERIES_COLOR[k]} strokeWidth={2} dot={{ r: 3 }} />
                 ))}
               </LineChart>
             ) : (
@@ -873,7 +922,7 @@ function GrowthChart({
                   formatter={(v: any, k: any) => [fmt(Number(v)), k]}
                 />
                 <Legend wrapperStyle={{ color: CHART.axis, fontSize: 12 }} />
-                {monthlySeries.map((k) => (
+                {visibleKeys.map((k) => (
                   <Bar key={k} dataKey={k} fill={monthlyColors[k]} radius={[4, 4, 0, 0]} />
                 ))}
               </BarChart>
