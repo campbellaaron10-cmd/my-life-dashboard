@@ -40,7 +40,7 @@ export type MonthDerived = {
   budget: number;
   budgetIsOverride: boolean;
   alloc: { ESS: number; FUN: number; STS: number };
-  spent: { HOU: number; ESS: number; FUN: number };
+  spent: { HOU: number; ESS: number; FUN: number; VAC: number; STS: number };
   contrib: { STS: number; LTS: number; FED: number; RSU: number };
   spentTotal: number;
   remaining: number;
