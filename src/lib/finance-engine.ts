@@ -255,10 +255,13 @@ export function computeFinance(input: EngineInput): EngineResult {
     regionsRunning += regionsDeltaByMonth.get(month) ?? 0;
     for (const code of BALANCE_CODES) {
       if (code === "Regions" && regionsAcc) {
-        // Ledger-derived, so editing a transaction's date/amount moves the trend.
-        balances.Regions = regionsRunning;
+        // Imported history keeps its stored value; live months follow the ledger,
+        // so editing a transaction's date/amount moves the trend.
+        const storedRegions = summaryBalance(s, "Regions");
+        balances.Regions = isHistorical && storedRegions ? storedRegions : regionsRunning;
         continue;
       }
+
       const stored = summaryBalance(s, code);
       const snap = snapshotBalance(month, SNAPSHOT_PATTERNS[code]);
       if (stored) { balances[code] = stored; continue; }
