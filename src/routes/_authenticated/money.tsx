@@ -308,7 +308,8 @@ function FinancesDashboard() {
           <EmptyState text="No budget categories yet." />
         ) : (
           <div className="grid gap-5 md:grid-cols-2">
-            {allBudgets.map((c) => (
+            {/* FED / LTS / RSU balances live in the top tiles + growth chart. */}
+            {allBudgets.filter((c) => !["FED", "LTS", "RSU"].includes(c.code)).map((c) => (
               <BudgetRow
                 key={c.id}
                 cat={c}
