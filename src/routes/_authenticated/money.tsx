@@ -1023,7 +1023,12 @@ function TxnDialog({ open, initial, accounts, categories, onClose }: { open: boo
   const upsert = useUpsertTransaction();
   const del = useDeleteTransaction();
   const [form, setForm] = useState<Partial<Transaction>>({});
-  useEffect(() => { setForm(initial ?? {}); }, [initial]);
+  useEffect(() => {
+    if (initial?.id || initial?.account_id) { setForm(initial); return; }
+    // Default new transactions to the Regions account (most-used)
+    const regions = accounts.find((a) => /regions/i.test(a.name));
+    setForm(regions ? { ...initial, account_id: regions.id } : (initial ?? {}));
+  }, [initial, accounts]);
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="glass-panel">
